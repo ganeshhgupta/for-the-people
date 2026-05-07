@@ -1,0 +1,25 @@
+{
+  "name": "tristhana",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @tristhana/web dev",
+    "worker": "pnpm --filter @tristhana/worker dev",
+    "build": "pnpm --filter @tristhana/web build",
+    "db:push": "pnpm --filter @tristhana/db push",
+    "db:studio": "pnpm --filter @tristhana/db studio",
+    "ingest:once": "pnpm --filter @tristhana/worker ingest:once",
+    "cluster:once": "pnpm --filter @tristhana/worker cluster:once",
+    "synth:one": "pnpm --filter @tristhana/worker synth:one",
+    "verify:stats": "pnpm --filter @tristhana/stats-verifier verify",
+    "eval:run": "pnpm --filter @tristhana/eval run",
+    "smoke": "pnpm --filter @tristhana/shared test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0"
+  }
+}

@@ -1,0 +1,143 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Light (default / newspaper) ───────────────────── */
+:root {
+  --paper:      #f5f0e3;
+  --paper-alt:  #ede8d6;
+  --ink:        #1a1008;
+  --ink-muted:  #5a5040;
+  --ink-faint:  #9a9080;
+  --rule:       #ccc5b0;
+  --rule-heavy: #8a8070;
+  --red:        #8b0000;
+  --navy:       #1a3560;
+  --forest:     #1e3a1e;
+  --gold:       #8b6914;
+  --card-hover: #ece7d5;
+  --header-bg:  #f5f0e3;
+  --header-border: #8a8070;
+  --btn-bg:     #e8e2ce;
+  --btn-text:   #1a1008;
+}
+
+/* ── Dark ──────────────────────────────────────────── */
+[data-theme="dark"] {
+  --paper:      #1c1917;
+  --paper-alt:  #242018;
+  --ink:        #e8e0cc;
+  --ink-muted:  #a09878;
+  --ink-faint:  #6a6050;
+  --rule:       #38352a;
+  --rule-heavy: #504d3e;
+  --red:        #c0392b;
+  --navy:       #4a7abf;
+  --forest:     #3d8a3d;
+  --gold:       #c9a227;
+  --card-hover: #252218;
+  --header-bg:  #1c1917;
+  --header-border: #504d3e;
+  --btn-bg:     #2e2b20;
+  --btn-text:   #e8e0cc;
+}
+
+html { font-size: 16px; }
+
+body {
+  font-family: var(--font-crimson, 'Crimson Text', Georgia, 'Times New Roman', serif);
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.65;
+  min-height: 100vh;
+  transition: background 0.2s, color 0.2s;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-playfair, 'Playfair Display', Georgia, 'Times New Roman', serif);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ── Small caps utility ─────────────────────────────── */
+.sc {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Sticky masthead ─────────────────────────────────── */
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: var(--header-bg);
+  border-bottom: 2px solid var(--header-border);
+  transition: background 0.2s;
+}
+
+/* ── Story card ─────────────────────────────────────── */
+.story-card { cursor: pointer; transition: background 0.1s; }
+.story-card:hover,
+.story-card:focus-visible { background: var(--card-hover); outline: none; }
+.story-card.expanded { background: var(--card-hover); }
+
+/* ── Fact bar ────────────────────────────────────────── */
+.fact-bar-track {
+  height: 5px;
+  background: var(--rule);
+  border-radius: 99px;
+  overflow: hidden;
+  margin: 0.35rem 0 0.2rem;
+}
+.fact-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s; }
+
+/* ── Perspectives grid ───────────────────────────────── */
+.persp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--rule-heavy);
+}
+.persp-col { padding: 1.1rem 1.25rem; }
+.persp-col + .persp-col { border-left: 1px solid var(--rule-heavy); }
+.persp-other { grid-column: 1 / -1; border-top: 1px solid var(--rule-heavy); padding: 1rem 1.25rem; }
+
+/* ── Ctrl button ─────────────────────────────────────── */
+.ctrl-btn {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border: 1px solid var(--rule);
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.7rem;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.ctrl-btn:hover { background: var(--rule); }
+
+/* ── Expand animation ────────────────────────────────── */
+.expand-enter {
+  animation: fadeSlide 0.2s ease forwards;
+}
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 680px) {
+  html { font-size: 15px; }
+  .persp-grid { grid-template-columns: 1fr; }
+  .persp-col + .persp-col { border-left: none; border-top: 1px solid var(--rule-heavy); }
+  .persp-other { grid-column: 1; }
+  .hide-mobile { display: none !important; }
+  .stats-grid { grid-template-columns: 1fr 1fr !important; }
+}
+@media (min-width: 681px) and (max-width: 1024px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}

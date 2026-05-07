@@ -1,0 +1,71 @@
+import { NextResponse } from 'next/server';
+import { getDb } from '../../../../lib/db';
+import { clusters, syntheses, articles } from '@tristhana/db';
+import { eq, desc, sql } from 'drizzle-orm';
+
+export const dynamic = 'force-dynamic';
+
+const POSITIVE_WORDS = new Set([
+  'harmony','peace','unity','rescue','award','achievement','innovation',
+  'conservation','celebration','festival','milestone','progress','initiative',
+  'success','breakthrough','historic','hope','inspire','community','empower',
+  'reconcil','cooperation','agreement','dialogue','rebuild','recovery','help',
+  'support','donate','launch','growth','development','protect','save','clean',
+  'green','heritage','culture','art','sports','olympic','medal','champion',
+  'relief','aid','welfare','education','school','hospital','vaccine','cure',
+]);
+
+function isPositiveTitle(title: string): boolean {
+  const words = title.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/);
+  return words.some(w => POSITIVE_WORDS.has(w));
+}
+
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const offset = Math.max(0, parseInt(url.searchParams.get('offset') ?? '0'));
+  const limit = 10;
+
+  const db = getDb();
+
+  // Fetch all synthesized clusters with their syntheses
+  const allClusters = await db
+    .select()
+    .from(clusters)
+    .where(eq(clusters.status, 'synthesized'))
+    .orderBy(desc(clusters.createdAt));
+
+  const allSynths = await db.select({ clusterId: syntheses.clusterId, output: syntheses.output }).from(syntheses);
+  const synthMap = new Map(allSynths.map(s => [s.clusterId, s.output as Record<string, unknown>]));
+
+  // Filter: has common_ground in synthesis OR positive title keywords
+  const positive = allClusters.filter(c => {
+    if (isPositiveTitle(c.canonicalTitle)) return true;
+    const out = synthMap.get(c.id);
+    if (!out) return false;
+    const cg = out.common_ground;
+    return Array.isArray(cg) && cg.length > 0;
+  });
+
+  const pageRows = positive.slice(offset, offset + limit);
+  const hasMore = positive.length > offset + limit;
+
+  const coverMap: Record<string, string | null> = {};
+  for (const row of pageRows) {
+    const imgs = await db.select({ imageUrl: articles.imageUrl }).from(articles).where(eq(articles.clusterId, row.id));
+    coverMap[row.id] = imgs.find(i => i.imageUrl)?.imageUrl ?? null;
+  }
+
+  return NextResponse.json({
+    clusters: pageRows.map(r => ({
+      id: r.id,
+      canonicalTitle: r.canonicalTitle,
+      status: r.status,
+      articleCount: r.articleCount,
+      createdAt: r.createdAt.toISOString(),
+      coverImage: coverMap[r.id] ?? null,
+    })),
+    hasMore,
+    nextOffset: offset + limit,
+    total: positive.length,
+  });
+}

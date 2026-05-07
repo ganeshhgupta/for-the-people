@@ -1,0 +1,28 @@
+{
+  "name": "@tristhana/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "ingest:once": "tsx src/ingest.ts",
+    "cluster:once": "tsx src/cluster.ts",
+    "synth:one": "tsx src/synth.ts",
+    "link:once": "tsx src/link.ts"
+  },
+  "dependencies": {
+    "@tristhana/db": "workspace:*",
+    "@tristhana/shared": "workspace:*",
+    "better-sqlite3": "^11.7.0",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.38.3",
+    "groq-sdk": "^0.9.1",
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

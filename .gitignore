@@ -1,0 +1,7 @@
+node_modules/
+.next/
+dist/
+.env.local
+*.db-shm
+*.db-wal
+# Keep tristhana.db in repo so Vercel has data to display
