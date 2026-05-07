@@ -583,8 +583,11 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
         </div>
       </div>
 
-      {/* ── Swipe container ── */}
-      <div style={{ overflow:'hidden' }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      {/* ── Swipe container — breaks out of main's 1rem padding so overflow:hidden clips at viewport edge ── */}
+      <div
+        style={{ overflow:'hidden', marginLeft:'-1rem', marginRight:'-1rem' }}
+        onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+      >
         <div style={{
           display:'flex', width:'200%',
           transform: `translateX(${channel === 'main' ? '0%' : '-50%'})`,
@@ -592,8 +595,8 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
           willChange:'transform',
           alignItems:'flex-start',
         }}>
-          {/* Main feed */}
-          <div style={{ width:'50%' }}>
+          {/* Main feed — each panel has its own overflow:hidden + 1rem padding to match main */}
+          <div style={{ width:'50%', overflow:'hidden', paddingLeft:'1rem', paddingRight:'1rem' }}>
             <div className="sc" style={{ color:'var(--ink-muted)', padding:'0.6rem 0 0.4rem', borderBottom:'1px solid var(--rule)' }}>Today's Stories</div>
             <FeedPanel
               clusters={mainClusters} expandedId={expandedId} loadingId={loadingId} cache={cache} onExpand={expand}
@@ -602,7 +605,7 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
             />
           </div>
           {/* Good news feed */}
-          <div style={{ width:'50%' }}>
+          <div style={{ width:'50%', overflow:'hidden', paddingLeft:'1rem', paddingRight:'1rem' }}>
             <div className="sc" style={{ color:'var(--forest)', padding:'0.6rem 0 0.4rem', borderBottom:'1px solid var(--rule)' }}>✦ Good News</div>
             {!goodLoaded && channel === 'good' && goodLoadingMore && (
               <p className="sc" style={{ padding:'2rem 0', textAlign:'center', color:'var(--ink-faint)' }}>Finding good news…</p>
