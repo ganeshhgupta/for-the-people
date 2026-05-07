@@ -1,6 +1,6 @@
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { pgTable, text, integer, timestamp, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
-export const clusters = sqliteTable(
+export const clusters = pgTable(
   'clusters',
   {
     id: text('id').primaryKey(),
@@ -8,24 +8,24 @@ export const clusters = sqliteTable(
     storyFingerprint: text('story_fingerprint').notNull(),
     status: text('status').notNull().default('pending'),
     articleCount: integer('article_count').notNull().default(0),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('clusters_status_idx').on(t.status), index('clusters_created_idx').on(t.createdAt)]
 );
 
-export const articles = sqliteTable(
+export const articles = pgTable(
   'articles',
   {
     id: text('id').primaryKey(),
     sourceId: text('source_id').notNull(),
     url: text('url').notNull().unique(),
     title: text('title').notNull(),
-    publishedAt: integer('published_at', { mode: 'timestamp' }).notNull(),
+    publishedAt: timestamp('published_at', { mode: 'date', withTimezone: true }).notNull(),
     bodyExcerpt: text('body_excerpt').notNull().default(''),
     imageUrl: text('image_url'),
     clusterId: text('cluster_id').references(() => clusters.id),
-    ingestedAt: integer('ingested_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+    ingestedAt: timestamp('ingested_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     index('articles_source_idx').on(t.sourceId),
@@ -34,24 +34,24 @@ export const articles = sqliteTable(
   ]
 );
 
-export const syntheses = sqliteTable('syntheses', {
+export const syntheses = pgTable('syntheses', {
   id: text('id').primaryKey(),
   clusterId: text('cluster_id')
     .notNull()
     .unique()
     .references(() => clusters.id),
-  output: text('output', { mode: 'json' }).notNull(),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  output: jsonb('output').notNull(),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
 });
 
-export const clusterLinks = sqliteTable(
+export const clusterLinks = pgTable(
   'cluster_links',
   {
     id: text('id').primaryKey(),
     fromClusterId: text('from_cluster_id').notNull().references(() => clusters.id),
     toClusterId: text('to_cluster_id').notNull().references(() => clusters.id),
     sharedEntities: text('shared_entities').notNull().default('[]'),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex('cluster_links_pair_idx').on(t.fromClusterId, t.toClusterId),

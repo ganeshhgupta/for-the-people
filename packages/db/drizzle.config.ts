@@ -1,11 +1,14 @@
 import { defineConfig } from 'drizzle-kit';
-import { join } from 'path';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+config({ path: resolve(process.cwd(), '../../.env.local') });
 
 export default defineConfig({
   schema: './src/schema.ts',
   out: './drizzle',
-  dialect: 'sqlite',
+  dialect: 'postgresql',
   dbCredentials: {
-    url: process.env['DB_PATH'] ?? join(process.cwd(), 'tristhana.db'),
+    url: process.env['DATABASE_URL']!,
   },
 });

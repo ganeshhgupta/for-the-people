@@ -11,16 +11,15 @@
     "link:once": "tsx src/link.ts"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
     "@tristhana/db": "workspace:*",
     "@tristhana/shared": "workspace:*",
-    "better-sqlite3": "^11.7.0",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",
     "groq-sdk": "^0.9.1",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
