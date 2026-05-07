@@ -5,3 +5,5 @@ dist/
 *.db-shm
 *.db-wal
 # Keep tristhana.db in repo so Vercel has data to display
+
+.vercel

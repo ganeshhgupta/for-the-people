@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node -e \"const{cpSync,existsSync}=require('fs');const p='../../tristhana.db';if(existsSync(p))cpSync(p,'tristhana.db');\"",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"
