@@ -219,7 +219,6 @@ function StoryContent({ data, clusterId }: { data:StoryData; clusterId:string })
           <span className="sc" style={{ color:col }}>{pct}% factual · {100-pct}% disputed</span>
         </div>
         <div className="fact-bar-track" style={{ marginTop:'0.35rem' }}><div className="fact-bar-fill" style={{ width:`${pct}%`, background:col }} /></div>
-        {s.model_uncertainty_notes && <p style={{ fontSize:'0.78rem', fontStyle:'italic', color:'var(--ink-faint)', marginTop:'0.3rem' }}>{s.model_uncertainty_notes}</p>}
       </div>
 
       {/* Facts */}
@@ -237,14 +236,12 @@ function StoryContent({ data, clusterId }: { data:StoryData; clusterId:string })
 
       {/* POVs */}
       {povs.length > 0 && (
-        <div style={{ padding:'0.75rem 0', borderBottom:'1px solid var(--rule)' }}>
-          <div className="sc" style={{ color:'var(--ink-muted)', marginBottom:'0.5rem' }}>{povs.length === 1 ? 'Point of view' : 'Points of view'}</div>
+        <div style={{ padding:'0.45rem 0', borderBottom:'1px solid var(--rule)', display:'flex', flexDirection:'column', gap:'0.35rem' }}>
           {povs.map((pov,idx) => (
-            <div key={idx} style={{ background:'var(--paper-alt)', borderTop: idx===0 ? '1px solid var(--rule-heavy)' : '1px solid var(--rule)', padding:'0.9rem 1rem' }}>
-              <div className="sc" style={{ color:'var(--rule-heavy)', marginBottom:'0.3rem', paddingBottom:'0.2rem', borderBottom:'1px solid var(--rule)' }}>POV {idx+1}</div>
-              <p style={{ fontSize:'0.93rem', lineHeight:1.55 }}>{pov.summary}</p>
-              {pov.key_claims.slice(0,2).map((c,i) => (
-                <p key={i} style={{ fontSize:'0.82rem', color:'var(--ink-muted)', marginTop:'0.35rem', paddingLeft:'0.55rem', borderLeft:'2px solid var(--rule-heavy)' }}>{c.claim}</p>
+            <div key={idx} style={{ borderLeft:'2px solid var(--rule-heavy)', paddingLeft:'0.65rem', paddingTop:'0.2rem', paddingBottom:'0.2rem' }}>
+              <p style={{ fontSize:'0.9rem', lineHeight:1.45, color:'var(--ink)' }}>{pov.summary}</p>
+              {pov.key_claims.slice(0,1).map((c,i) => (
+                <p key={i} style={{ fontSize:'0.8rem', color:'var(--ink-muted)', marginTop:'0.15rem' }}>{c.claim}</p>
               ))}
             </div>
           ))}
