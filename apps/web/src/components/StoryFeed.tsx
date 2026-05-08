@@ -474,8 +474,10 @@ function StoryCard({ cluster, expandedId, loadingId, data, onExpand, videoMode, 
   const [playingVideoId, setPlayingVideoId] = useState<string|null>(null);
   const [videoCache, setVideoCache]         = useState<VideoData[]|null>(null);
   const [trailOpen, setTrailOpen]           = useState(false);
+  const [isMuted, setIsMuted]               = useState(true);
   const touchX        = useRef(0);
   const videoCacheRef = useRef<VideoData[]|null>(null);
+  const iframeRef     = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => { videoCacheRef.current = videoCache; }, [videoCache]);
   useEffect(() => { if (!isOpen) setPlayingVideoId(null); }, [isOpen]);
@@ -497,7 +499,18 @@ function StoryCard({ cluster, expandedId, loadingId, data, onExpand, videoMode, 
 
   function switchVideo(id: string | null) {
     setPlayingVideoId(id);
+    setIsMuted(true);
     onActivate(id ? cluster.id : null);
+  }
+
+  function toggleMute() {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    win.postMessage(
+      JSON.stringify({ event: 'command', func: isMuted ? 'unMute' : 'mute', args: [] }),
+      '*'
+    );
+    setIsMuted(m => !m);
   }
 
   async function navigate(dir: 'left' | 'right') {
@@ -569,7 +582,8 @@ function StoryCard({ cluster, expandedId, loadingId, data, onExpand, videoMode, 
             {playingVideoId && (
               <>
                 <iframe
-                  src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1&mute=1&playsinline=1&rel=0`}
+                  ref={iframeRef}
+                  src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1&mute=1&playsinline=1&rel=0&enablejsapi=1`}
                   title="video"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
@@ -581,6 +595,22 @@ function StoryCard({ cluster, expandedId, loadingId, data, onExpand, videoMode, 
                   onTouchStart={onTouchStart}
                   onTouchEnd={onTouchEnd}
                 />
+                {/* Mute toggle — postMessage to YT player since overlay blocks native controls */}
+                <button
+                  onClick={e => { e.stopPropagation(); toggleMute(); }}
+                  aria-label={isMuted ? 'Unmute' : 'Mute'}
+                  style={{ position:'absolute', bottom:'10px', left:'10px',
+                    background:'rgba(0,0,0,0.65)', border:'none', color:'#fff',
+                    borderRadius:'4px', padding:'4px 8px', zIndex:10,
+                    cursor:'pointer', fontSize:'0.75rem', lineHeight:1.3,
+                    display:'flex', alignItems:'center', gap:'4px' }}
+                >
+                  {isMuted
+                    ? <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06A8.99 8.99 0 0 0 17.73 18l1.99 2L21 18.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                  }
+                  {isMuted ? 'Tap to unmute' : 'Mute'}
+                </button>
                 <button
                   onClick={e => { e.stopPropagation(); switchVideo(null); }}
                   aria-label="Close video"
