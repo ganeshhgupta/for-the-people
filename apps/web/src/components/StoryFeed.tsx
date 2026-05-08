@@ -344,7 +344,7 @@ function StoryContent({ data, clusterId, onPlay, playingVideoId, videoCache, onV
                     style={{ display:'flex', alignItems:'flex-start', gap:'0.4rem', cursor:'pointer' }}
                     onClick={e => { e.stopPropagation(); togglePov(idx); }}
                   >
-                    <p style={{ flex:1, fontSize:'0.97rem', lineHeight:1.55, color:'var(--ink)', margin:0 }}>
+                    <p style={{ flex:1, fontSize:'1.06rem', lineHeight:1.6, fontWeight:600, color:'var(--ink)', margin:0 }}>
                       {isExpanded ? pov.summary : preview}
                     </p>
                     <svg

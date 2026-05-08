@@ -12,8 +12,8 @@ export function SplashScreen() {
       return;
     }
     sessionStorage.setItem('ftp-splash', '1');
-    const t1 = setTimeout(() => setFading(true), 1600);
-    const t2 = setTimeout(() => setVisible(false), 2300);
+    const t1 = setTimeout(() => setFading(true), 2600);
+    const t2 = setTimeout(() => setVisible(false), 3300);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
@@ -61,7 +61,7 @@ export function SplashScreen() {
       <p style={{
         fontFamily: 'var(--font-crimson)',
         fontSize: 'clamp(0.65rem, 1.8vw, 0.8rem)',
-        color: 'var(--ink-faint)',
+        color: 'var(--ink-muted)',
         fontStyle: 'italic',
         animation: 'splashIn 0.9s ease 0.5s forwards',
         opacity: 0,
