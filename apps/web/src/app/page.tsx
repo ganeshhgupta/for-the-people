@@ -32,7 +32,8 @@ export default async function HomePage() {
     coverImage: coverMap[r.id] ?? null,
   }));
 
-  const [{ totalCount }] = await db.select({ totalCount: sql<number>`cast(count(*) as int)` }).from(clusters);
+  const countRows = await db.select({ totalCount: sql<number>`cast(count(*) as int)` }).from(clusters);
+  const totalCount = countRows[0]?.totalCount ?? 0;
 
   return <StoryFeed initialClusters={clusterData} totalCount={totalCount} />;
 }
