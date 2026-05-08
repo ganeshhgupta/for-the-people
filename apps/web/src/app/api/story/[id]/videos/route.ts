@@ -86,7 +86,7 @@ export async function GET(
     }
 
     const videos = candidates
-      .map(v => ({ ...v, hasChapters: chapterMap[v.videoId] ?? false }))
+      .map(v => ({ ...v, hasChapters: chapterMap[v.videoId as string] ?? false }))
       .sort((a, b) => (b.hasChapters ? 1 : 0) - (a.hasChapters ? 1 : 0) || b.overlap - a.overlap)
       .slice(0, 6)
       .map(({ overlap: _, ...v }) => v);
