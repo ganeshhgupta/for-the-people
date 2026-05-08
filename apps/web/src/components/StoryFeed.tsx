@@ -238,11 +238,16 @@ function StoryContent({ data, clusterId }: { data:StoryData; clusterId:string })
       {povs.length > 0 && (
         <div style={{ padding:'0.45rem 0', borderBottom:'1px solid var(--rule)', display:'flex', flexDirection:'column', gap:'0.35rem' }}>
           {povs.map((pov,idx) => (
-            <div key={idx} style={{ borderLeft:'2px solid var(--rule-heavy)', paddingLeft:'0.65rem', paddingTop:'0.2rem', paddingBottom:'0.2rem' }}>
-              <p style={{ fontSize:'0.9rem', lineHeight:1.45, color:'var(--ink)' }}>{pov.summary}</p>
-              {pov.key_claims.slice(0,1).map((c,i) => (
-                <p key={i} style={{ fontSize:'0.8rem', color:'var(--ink-muted)', marginTop:'0.15rem' }}>{c.claim}</p>
-              ))}
+            <div key={idx} style={{ display:'flex', alignItems:'flex-start', gap:'0.4rem' }}>
+              <span className="sc" style={{ fontSize:'0.58rem', color:'var(--ink-faint)', paddingTop:'0.28rem', flexShrink:0, width:'1.4rem', textAlign:'right' }}>
+                P{idx+1}
+              </span>
+              <div style={{ borderLeft:'2px solid var(--rule-heavy)', paddingLeft:'0.65rem', paddingTop:'0.2rem', paddingBottom:'0.2rem', flex:1 }}>
+                <p style={{ fontSize:'0.9rem', lineHeight:1.45, color:'var(--ink)' }}>{pov.summary}</p>
+                {pov.key_claims.slice(0,1).map((c,i) => (
+                  <p key={i} style={{ fontSize:'0.8rem', color:'var(--ink-muted)', marginTop:'0.15rem' }}>{c.claim}</p>
+                ))}
+              </div>
             </div>
           ))}
         </div>
