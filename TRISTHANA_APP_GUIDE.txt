@@ -1,0 +1,693 @@
+TRISTHANA / FOR THE PEOPLE — COMPLETE APP GUIDE
+================================================
+Written: May 2026
+Last Updated: May 8 2026
+Purpose: Enable a fresh Claude session to rebuild this app end-to-end from scratch,
+         understand current state, known bugs, and roadmap.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VISION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"For the People" is an Indian news synthesis app that shows you the same news story
+through multiple political lenses simultaneously — right, left, and centre — without
+telling you what to think.
+
+The core insight: Indian media is deeply politically polarized. OpIndia and The Wire
+cover the same event as if they happened on different planets. Rather than pretending
+neutrality (which is itself a political position), this app:
+
+  1. Ingests articles from 35+ sources across the Indian political spectrum
+  2. Clusters articles about the same real-world event
+  3. Runs a synthesis through Gemini 2.0 Flash (or Groq fallback) that produces a
+     structured JSON with:
+     - Established facts (adjudicated by courts, official records)
+     - Reported facts (3+ sources, 2+ lean buckets within 24h)
+     - Contested claims: right narrative, left narrative, other narrative
+     - Named individuals with procedural status (convicted/charged/alleged)
+     - Rhetoric flags (red herrings, broken promises, evasion, factual falsehoods)
+     - Statistics with source citations
+     - Common ground proposals or irreconcilable disagreements
+  4. Presents all of this in a newspaper-aesthetic mobile UI
+
+The app is NOT a neutral aggregator. It actively applies epistemological rules to
+distinguish facts from narratives. It names names. It flags politicians' lies equally
+regardless of party.
+
+Target user: Indians who are tired of consuming only one side's reality bubble.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REPO STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+tristhana/                         ← monorepo root (pnpm workspaces)
+├── apps/
+│   ├── web/                       ← Next.js 15 app (deployed on Vercel)
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── page.tsx       ← Server component: fetches initial clusters, renders StoryFeed
+│   │   │   │   ├── layout.tsx     ← Root layout: fonts (Playfair Display, Crimson Text), theme
+│   │   │   │   ├── globals.css    ← CSS variables (light/dark themes), utility classes
+│   │   │   │   └── api/
+│   │   │   │       ├── cron/
+│   │   │   │       │   └── pipeline/route.ts  ← AUTO-PIPELINE: every-minute Vercel cron
+│   │   │   │       │                            Ingest (RSS + Brave) → cluster → Gemini synth
+│   │   │   │       ├── feed/
+│   │   │   │       │   ├── route.ts              ← GET /api/feed — main chronological feed
+│   │   │   │       │   ├── positive/route.ts     ← GET /api/feed/positive — filtered for positive stories
+│   │   │   │       │   └── category/route.ts     ← GET /api/feed/category?cat=sports — keyword-filtered
+│   │   │   │       └── story/[id]/
+│   │   │   │           ├── route.ts              ← GET /api/story/:id — synthesis + articles for a cluster
+│   │   │   │           ├── reasons/route.ts      ← GET — linked clusters (shared entities)
+│   │   │   │           ├── trail/route.ts        ← GET SSE stream — AI causal trail builder
+│   │   │   │           ├── chat/route.ts         ← POST — stream chat about story context
+│   │   │   │           ├── videos/route.ts       ← GET — YouTube video search
+│   │   │   │           └── reels/route.ts        ← GET — (placeholder)
+│   │   │   ├── components/
+│   │   │   │   ├── StoryFeed.tsx  ← Main client component: all UI logic (1100+ lines)
+│   │   │   │   ├── SplashScreen.tsx ← Splash on first visit: "For the People" h1 + tagline
+│   │   │   │   └── TrailDrawer.tsx ← Slide-up drawer for causal trail + chat (portal-rendered)
+│   │   │   └── lib/
+│   │   │       └── db.ts          ← Singleton Drizzle client for Neon PostgreSQL
+│   │   ├── .env.local             ← DATABASE_URL, GROQ_API_KEY, BRAVE_API_KEY, GEMINI_API_KEY, YOUTUBE_API_KEY
+│   │   └── package.json
+│   │
+│   └── worker/                    ← Node.js worker: manual ingest → cluster → synthesize
+│       └── src/
+│           ├── ingest.ts          ← Fetches RSS feeds, extracts article text, stores in DB
+│           ├── cluster.ts         ← Groups articles into story clusters (Jaccard + Groq titles)
+│           ├── synth.ts           ← Calls Groq LLaMA-3.3-70b to synthesize each cluster
+│           ├── link.ts            ← Creates cluster_links (shared entities between clusters)
+│           └── index.ts           ← CLI entry: pnpm ingest:once / cluster:once / synth:one
+│
+├── packages/
+│   ├── db/                        ← Drizzle ORM schema + migrations
+│   │   └── src/
+│   │       ├── schema.ts          ← Tables: clusters, articles, syntheses, trails, cluster_links
+│   │       ├── client.ts          ← Neon PostgreSQL connection via @neondatabase/serverless
+│   │       └── migrate.ts         ← pnpm db:migrate
+│   └── shared/                    ← Types and prompts shared between web and worker
+│       └── src/
+│           ├── schemas.ts         ← Zod schema for SynthesisOutput (the JSON output)
+│           ├── synthesis-prompt.ts ← The 100-line system prompt + user message builder
+│           └── sources.ts         ← All 35+ news sources with lean, factuality, notes
+│
+├── scripts/                       ← One-off data-population scripts (Node ESM)
+│   ├── insert-synth.mjs           ← Manually inserts clusters 1-16 into syntheses table
+│   ├── insert-synth-2.mjs         ← Manually inserts clusters 17-20
+│   ├── insert-wb-synth.mjs        ← West Bengal Election 2026 synthesis (cluster 70e1e3d2422f30b5)
+│   └── scrape-wb-election.mjs     ← Scrapes WB election articles via Brave, inserts to DB
+│
+vercel.json                        ← framework:nextjs + crons config (every minute)
+pnpm-workspace.yaml                ← Workspace definition
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATABASE SCHEMA (Neon PostgreSQL via Drizzle ORM)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+clusters
+  id              text PK
+  canonical_title text
+  story_fingerprint text
+  status          text  ('pending' | 'synthesized')
+  article_count   int
+  created_at      timestamp
+  updated_at      timestamp
+
+articles
+  id              text PK
+  source_id       text  (references SOURCES array id)
+  url             text UNIQUE
+  title           text
+  published_at    timestamp
+  body_excerpt    text
+  image_url       text nullable
+  cluster_id      text FK → clusters.id nullable
+  ingested_at     timestamp
+
+syntheses
+  id              text PK
+  cluster_id      text UNIQUE FK → clusters.id
+  output          jsonb  (SynthesisOutput object)
+  created_at      timestamp
+
+trails
+  id              text PK
+  cluster_id      text UNIQUE FK → clusters.id
+  nodes           jsonb  (causal trail nodes)
+  created_at      timestamp
+
+cluster_links
+  id              text PK
+  from_cluster_id text FK → clusters.id
+  to_cluster_id   text FK → clusters.id
+  shared_entities text  (JSON array of entity names)
+  created_at      timestamp
+  UNIQUE(from_cluster_id, to_cluster_id)
+
+DB HISTORY: Originally SQLite. Migrated to Neon PostgreSQL (serverless) in May 2026.
+Migration script at packages/db/src/migrate-data.ts.
+DATABASE_URL env var points to Neon pooler connection string.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+AUTO PIPELINE (NEW — primary data flow)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+File: apps/web/src/app/api/cron/pipeline/route.ts
+Trigger: Vercel Cron, fires every minute (vercel.json: "schedule": "* * * * *")
+Auth: Vercel auto-injects CRON_SECRET; route checks Authorization: Bearer {CRON_SECRET}
+      (skipped locally when CRON_SECRET env var is not set)
+maxDuration: 300 seconds (5 min), with internal 4.5-min safety cutoff
+
+Each tick does:
+  1. INGEST (parallel):
+     - 12 RSS feeds fetched concurrently using built-in XML parser (no rss-parser dep needed)
+       NDTV, The Hindu, Times of India, Indian Express, Hindustan Times, India Today,
+       The Wire, Scroll.in, Republic World, News18, The Print, Firstpost
+     - 7 Brave News API queries (India politics/crime/economy/sports/tech/science/foreign)
+     - Deduplicates by URL (ON CONFLICT DO NOTHING)
+     - Extracts: title, published_at, body_excerpt, image_url
+
+  2. CLUSTER:
+     - Loads all articles without cluster_id
+     - Jaccard similarity on title tokens (threshold 0.22, 72h time window)
+     - Requires ≥2 articles from ≥2 different sources to form a cluster
+     - Calls Gemini to generate a neutral canonical title
+     - Inserts cluster row, updates article.cluster_id
+
+  3. SYNTHESIZE (max 3 per run, respects time budget):
+     - Loads pending clusters (status='pending'), processes up to 3
+     - Calls Gemini 2.0 Flash with the full synthesis system prompt
+     - Parses + validates output against SynthesisOutputSchema (Zod)
+     - Inserts into syntheses table, marks cluster status='synthesized'
+
+Response: { ok, elapsed, log[], timestamp }
+
+NOTE: Vercel Hobby plan only allows daily crons. Every-minute crons require Vercel Pro.
+      If on Hobby plan, change schedule to "0 * * * *" (hourly) or upgrade.
+      Required env vars in Vercel dashboard: GEMINI_API_KEY, BRAVE_API_KEY, DATABASE_URL
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MANUAL WORKER PIPELINE (fallback / backlog processing)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run from tristhana/apps/worker/:
+
+  pnpm --filter worker ingest:once
+    → Fetches all 35+ RSS feeds + NewsAPI.org (if NEWS_API_KEY set) + Guardian API
+    → For each new article: extracts body text, image, stores in articles table
+
+  pnpm --filter worker cluster:once
+    → Takes unclustered articles
+    → Groups by Jaccard keyword similarity + 72h time window
+    → Creates/updates cluster rows; calls Groq LLaMA-3.1-8b for canonical titles
+    → Links articles to clusters
+
+  pnpm --filter worker synth:one [cluster_id]
+    → Takes ONE 'pending' cluster (or specific cluster_id if provided)
+    → Builds synthesis prompt with all cluster articles
+    → Calls Groq LLaMA-3.3-70b-versatile
+    → Parses JSON response against SynthesisOutput Zod schema
+    → Stores in syntheses table, marks cluster as 'synthesized'
+    → Groq free tier: 100k tokens/day — main bottleneck for backlog
+
+  pnpm --filter worker link:once
+    → Scans synthesized clusters for shared named entities
+    → Creates cluster_links rows for story graph navigation
+
+Typical workflow for fresh data (manual):
+  1. pnpm --filter worker ingest:once
+  2. pnpm --filter worker cluster:once
+  3. Repeat: pnpm --filter worker synth:one (until quota hit or all done)
+  4. pnpm --filter worker link:once
+
+One-off scripts (run from repo root with node):
+  node scripts/scrape-wb-election.mjs     ← Scrapes a topic via Brave, creates cluster
+  node scripts/insert-wb-synth.mjs        ← Inserts manually-crafted synthesis JSON
+  node scripts/insert-synth.mjs           ← Batch-inserts 16 pre-written syntheses
+  node scripts/insert-synth-2.mjs         ← Batch-inserts 4 more pre-written syntheses
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SYNTHESIS PROMPT (The core epistemology)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Located at: packages/shared/src/synthesis-prompt.ts
+Used by: apps/worker/src/synth.ts (Groq) AND apps/web/src/app/api/cron/pipeline/route.ts (Gemini)
+
+The prompt enforces three tiers of factual confidence:
+  Tier 1: Adjudicated facts (courts, official commissions, RTI, autopsy reports)
+  Tier 2: Reported facts (3+ outlets, 2+ lean buckets, within 24h)
+  Tier 3: Contested claims (motive, blame, sequence — diverge by lean)
+
+Key rules:
+  - Name individuals; never anonymize when sources have named them
+  - Apply identical language for identical procedural status regardless of party/religion
+  - "Convicted of rape" not "convicted in a sexual offense matter"
+  - Don't construct causal chains — extract which prior events each SIDE'S outlets invoked
+  - Flag RED_HERRING, BROKEN_PROMISE, EVASION, THREAT, FACTUAL_FALSEHOOD for all parties
+  - Never invent statistics; empty array beats fabricated entry
+  - Counterweight LLM liberal bias when constructing right_narrative (steelman from sources)
+  - model_uncertainty_notes is required, never empty
+
+Output JSON schema (simplified):
+  {
+    story_age_band: "breaking"|"developing"|"mature"|"historical",
+    established_facts: [{claim, tier: 1, citations}],
+    reported_facts: [{claim, tier: 2, citations}],
+    contested_claims: {
+      right_narrative: {summary (4-6 sentences), key_claims, framing_devices, sources_used},
+      left_narrative: {same},
+      other_narrative: {same} | null
+    },
+    named_individuals: [{name, role, party, procedural_status, specific_acts, status_evidence}],
+    precedents_cited_by_right/left/other: [{event, year, citing_outlets}],
+    rhetoric_flags: [{type, leader_name, party, quoted_statement, context, contradicting_fact}],
+    statistics: [{claim, value, unit, year, source_authority, self_confidence}],
+    common_ground: [{proposal, why_right_accept, why_left_accept, why_fail}] | null,
+    irreconcilable_disagreements: [string],
+    model_uncertainty_notes: string
+  }
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NEWS SOURCES (35+ outlets)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RIGHT HEAVY: OpIndia, Swarajya, Organiser (RSS), TFI Post, Republic World, Zee News, India TV, Hindu Post
+RIGHT LEAN:  Daily Pioneer, Economic Times, News18, Firstpost, WION
+CENTRE:      The Hindu, Indian Express, Hindustan Times, Times of India, NDTV, The Print, India Today,
+             Mint, Business Standard, Financial Express, Deccan Herald, New Indian Express,
+             DNA India, Moneycontrol, Tribune India
+LEFT LEAN:   Scroll.in, The Quint, Newslaundry, The News Minute, Newsclick, The Citizen
+LEFT HEAVY:  The Wire, The Caravan, Frontline
+WIRE:        ANI (dominant wire service; note: NOT neutral — documented pro-government bias)
+
+Source metadata includes: lean, factuality (high/mostly/mixed/low), and detailed notes on
+editorial history, ownership, known biases, and specific documented failures.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+UI ARCHITECTURE (StoryFeed.tsx)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tech: Next.js 15, React, pure inline styles (no CSS-in-JS library), Playfair Display + Crimson Text fonts.
+Design: Indian newspaper aesthetic — sepia paper, ink colors, Playfair headings, Crimson body text.
+
+LAYOUT:
+  - Sticky masthead: title "For the People" + video mode toggle (left) + profile icon (right)
+  - Scrollable channel tabs in masthead: All News, Positive, Sports, Entertainment, Finance, Tech, Travel, Art, Politics
+  - Swipe container: 9-panel horizontal layout, CSS transform for sliding
+  - Fixed bottom nav (58px): Filters | Starred | [Positive News center button] | Search | Collapse
+  - Zero horizontal padding on <main> (removed in May 2026 to fix phone edge overflow)
+
+SPLASH SCREEN (SplashScreen.tsx):
+  - Shows once per session (sessionStorage key 'ftp-splash')
+  - h1: "For the People" (Playfair Display)
+  - Subtitle: "Cut the narratives. See things for what they are." (Crimson, italic)
+  - Secondary: "Agentic AI-Powered Fact-Checking News Platform" (small, faint)
+  - Fades out after 1.6s, unmounts at 2.3s
+
+STORY CARD:
+  - Cover image (full-bleed) OR YouTube video (swipe left to go to video, swipe right on video to return)
+  - YouTube video: muted autoplay (mute=1&playsinline=1&autoplay=1&enablejsapi=1)
+  - Custom mute toggle button (bottom-left, z-index:10) uses YouTube postMessage API to toggle mute
+    (needed because transparent swipe overlay at z-index:5 blocks all native YouTube controls)
+  - ✕ close button (top-right, z-index:10) to return to cover photo
+  - Headline + date + source count + star button
+  - On expand: fact bar (% factual vs disputed) + AI trail button (4-pointed star icon)
+  - Facts section: green bullets for established/reported facts
+  - POVs section: POV1/POV2/POV3 with collapse/expand chevron
+    - Collapsed: first 160 chars of summary
+    - Expanded: full summary + key_claims bullets + framing_devices tags
+  - People section: named individuals with procedural status badges
+  - Rhetoric flags: red-left-bordered with flag type + leader + quoted statement
+  - Statistics: grid layout with large numbers
+  - Sources: thumbnail + outlet name + lean label + published date + external link
+
+CHANNEL FEEDS (9 swipeable):
+  main          → /api/feed                           (all synthesized stories, sorted by article published_at DESC)
+  good          → /api/feed/positive                  (negative-word blocklist + keyword + common_ground filter)
+  sports        → /api/feed/category?cat=sports       (keyword filter per category)
+  entertainment → /api/feed/category?cat=entertainment
+  finance       → /api/feed/category?cat=finance
+  tech          → /api/feed/category?cat=tech
+  travel        → /api/feed/category?cat=travel
+  art           → /api/feed/category?cat=art
+  politics      → /api/feed/category?cat=politics
+
+Feed sorting (ALL channels):
+  ORDER BY (SELECT MAX(published_at) FROM articles WHERE cluster_id = clusters.id) DESC NULLS LAST
+  Sorts by the most recent article in each cluster, not by cluster insert time.
+
+Positive feed filtering (2 layers):
+  1. NEGATIVE_WORDS blocklist: death, deaths, poison, attack, kills, violence, crash, etc.
+     A story matching any negative word is EXCLUDED even if synthesis has common_ground.
+  2. POSITIVE_WORDS allowlist: award, achievement, success, celebration, etc.
+     OR synthesis.output.common_ground is non-empty array.
+
+Infinite scroll:
+  - page.tsx loads 20 clusters server-side (force-dynamic, not cached)
+  - Client fetches /api/feed?offset=N for more
+  - Total count via raw SQL: SELECT cast(count(*) as int) FROM clusters
+    (NOT db.$count() — unreliable due to Drizzle duplicate package conflict)
+
+OVERLAY PANELS (via bottom nav):
+  Search  → SearchPanel: text input, client-side filter over all loaded clusters
+  Starred → StarredPanel: stories starred via localStorage; star button on each card
+  Filters → FiltersPanel: placeholder ("coming soon")
+
+PROFILE DRAWER (top-right icon):
+  - Slide-in from right
+  - Night mode toggle (dark/light theme via CSS [data-theme="dark"])
+  - Auto-play videos toggle (localStorage: ftp-videomode)
+
+TRAIL DRAWER (4-star AI button in fact bar):
+  - Portal-rendered (createPortal to document.body) — CRITICAL to escape transform containing block
+  - SSE stream from /api/story/:id/trail (Server-Sent Events)
+  - Uses Groq LLaMA-3.3-70b with Brave Search tool calls to build causal trail
+  - Expandable branch nodes (⊕ N branches)
+  - Chat input: POST /api/story/:id/chat for follow-up questions
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ENVIRONMENT VARIABLES (.env.local in apps/web/)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DATABASE_URL    ← Neon PostgreSQL pooler connection string (required)
+GROQ_API_KEY    ← For trail builder (LLaMA-3.3-70b), story chat, and worker synth
+                  Free tier: 100,000 tokens/day
+BRAVE_API_KEY   ← BSAnsUq8Vavug2NYodu0FVL0duaxJYj (trail web search + cron ingest)
+GEMINI_API_KEY  ← AIzaSyAsDVIj1tC7uyMbIPu1iX28IxAbB3U9YKA
+                  Used by: cron pipeline for synthesis (Gemini 2.0 Flash)
+                  Also used by: /api/story/:id/videos (YouTube search — same key)
+YOUTUBE_API_KEY ← Same as GEMINI_API_KEY currently (both are Google API keys)
+CRON_SECRET     ← Auto-set by Vercel when crons are configured; also add manually
+                  for local testing. Check Authorization: Bearer {CRON_SECRET} in route.
+
+MUST ADD TO VERCEL DASHBOARD:
+  GEMINI_API_KEY = AIzaSyAsDVIj1tC7uyMbIPu1iX28IxAbB3U9YKA
+  CRON_SECRET    = (get from Vercel project settings after first deployment with crons)
+  (DATABASE_URL, GROQ_API_KEY, BRAVE_API_KEY should already be there)
+
+Note: Worker uses root .env.local (apps/worker/src/env.ts loads ../../../.env.local)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KNOWN BUGS AND ISSUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DRIZZLE DUPLICATE PACKAGE TYPESCRIPT ERRORS (non-blocking)
+   Location: apps/web/src/app/api/feed/route.ts, positive/route.ts, category/route.ts
+   Symptom: TypeScript errors about incompatible PgColumn types
+   Cause: pnpm installs two versions of drizzle-orm (apps/web + packages/db).
+   Fix: Add pnpm overrides in root package.json: "pnpm": { "overrides": { "drizzle-orm": "0.38.4" } }
+   Status: App runs fine at runtime; TypeScript errors are safe to ignore.
+   Workaround: typescript.ignoreBuildErrors: true in next.config.ts
+
+2. VERCEL CRON PLAN REQUIREMENT
+   Every-minute crons require Vercel Pro plan.
+   Vercel Hobby plan only supports daily crons ("0 0 * * *").
+   To use on Hobby: change vercel.json schedule to "0 * * * *" (hourly) or "0 */6 * * *" (every 6h).
+
+3. CRON GEMINI_API_KEY NOT YET IN VERCEL DASHBOARD
+   The new GEMINI_API_KEY (AIzaSyAsDVIj1tC7uyMbIPu1iX28IxAbB3U9YKA) must be added
+   to Vercel project environment variables for the cron pipeline to synthesize correctly.
+   Without it, synthesis step logs "GEMINI_API_KEY not set" and skips.
+
+4. POSITIVE NEWS FILTER STILL ROUGH
+   The negative-word blocklist prevents tragedies from appearing (fixed May 2026).
+   But many genuinely positive stories don't match POSITIVE_WORDS keywords either.
+   Better fix: add a "sentiment" field to synthesis output populated by Gemini during synthesis.
+
+5. CATEGORY FEEDS USE TITLE-ONLY KEYWORD MATCHING
+   /api/feed/category only matches keywords in canonical_title.
+   Better: tag clusters with categories during synthesis (add "categories" field to schema).
+
+6. STARRED PANEL SHOWS ONLY ALREADY-LOADED CLUSTERS
+   If a user stars a story, closes the app, reopens it, and the starred cluster hasn't been
+   loaded yet by infinite scroll, it won't appear in the Starred panel.
+   Fix: Fetch starred clusters by ID from server: GET /api/clusters/batch?ids=id1,id2,id3
+
+7. SWIPE NAVIGATION AND STORY EXPAND STATE
+   expandedId is global across all channels. Expanding a story on Politics then switching to
+   Sports and back shows the same story expanded. Minor UX issue.
+   Fix: Per-channel expandedId map.
+
+8. COVER IMAGES FETCHED ONE-BY-ONE
+   /api/feed fetches imageUrl per cluster in a loop (N queries for N clusters).
+   Fix: JOIN on articles, take first non-null image per cluster using DISTINCT ON.
+
+9. TRAIL BUILDER GROQ RATE LIMIT
+   Trail API and worker synthesis share the same Groq quota (100k tokens/day free tier).
+   Simultaneous use exhausts quota. Fix: separate keys or implement queuing.
+
+10. NO REAL-TIME PUSH
+    Users must reload to see new stories from cron pipeline.
+    Fix: SSE endpoint /api/feed/events that pushes new cluster IDs as they're synthesized.
+
+11. CLUSTER COVER IMAGES FETCHED N+1
+    Each cluster card makes a separate DB query for its cover image.
+    Fix: Use a single query with DISTINCT ON (cluster_id) to get first image per cluster.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DEPLOYMENT (Vercel)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+vercel.json (at repo root):
+  {
+    "framework": "nextjs",
+    "crons": [{ "path": "/api/cron/pipeline", "schedule": "* * * * *" }]
+  }
+
+Build: next build (typescript.ignoreBuildErrors: true in next.config.ts to bypass Drizzle TS errors)
+
+Environment variables in Vercel dashboard (required):
+  DATABASE_URL, GROQ_API_KEY, BRAVE_API_KEY, GEMINI_API_KEY, YOUTUBE_API_KEY, CRON_SECRET
+
+To deploy:
+  git push origin master  (auto-deploys on push to master via GitHub integration)
+
+To manually trigger:
+  cd apps/web && npx vercel --prod
+
+Note: Worker (apps/worker/) is NOT deployed to Vercel. It's a local CLI tool.
+      The new cron pipeline (/api/cron/pipeline) replaces the need to run worker manually.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ARCHITECTURE DECISIONS & WHY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHY NEON POSTGRESQL (not SQLite):
+  SQLite worked locally but Vercel serverless functions can't persist a SQLite file.
+  Neon provides serverless PostgreSQL with HTTP-based connection (no TCP pool needed).
+  @neondatabase/serverless driver works in Vercel Edge/Node environments.
+
+WHY DRIZZLE ORM:
+  Type-safe, Neon-compatible, minimal bundle size. Zod integration for schema validation.
+
+WHY GEMINI FOR CRON SYNTHESIS (not Groq):
+  Gemini 2.0 Flash is free with generous rate limits on the provided API key.
+  The cron pipeline needs to synthesize continuously; Groq's 100k/day free tier runs out.
+  Gemini also supports systemInstruction field natively, matching the prompt structure.
+
+WHY GROQ FOR TRAIL BUILDER (not Claude/Gemini):
+  The trail builder makes many tool calls (Brave search) in a single agentic session.
+  Groq's LLaMA-3.3-70b is fast and its API has good function-calling support.
+  Claude is more expensive; Gemini trail builder not yet implemented.
+
+WHY BRAVE NEWS API FOR CRON INGEST:
+  Free plan, Indian results good, freshness=pd gives past-24h articles.
+  No extra dependency needed (pure fetch). Works from Vercel serverless.
+
+WHY CUSTOM XML PARSER IN CRON (not rss-parser):
+  Avoids adding rss-parser as a dependency to apps/web.
+  The hand-rolled regex XML parser handles the specific RSS patterns from Indian news sites.
+  If it misses edge cases, rss-parser can be added: npm install rss-parser -w apps/web
+
+WHY CORRELATED SUBQUERY FOR FEED SORT:
+  SELECT MAX(published_at) FROM articles WHERE cluster_id = clusters.id
+  This sorts clusters by their freshest article, not by cluster insert time.
+  Avoids JOIN + GROUP BY complexity. Slightly slower than a JOIN but acceptable at this scale.
+
+WHY TRANSPARENT SWIPE OVERLAY ON VIDEO:
+  YouTube iframe creates a cross-origin boundary — touch events inside iframe don't bubble
+  to parent DOM elements. Transparent div at z-index:5 positioned over the iframe captures
+  swipe gestures. Custom mute button at z-index:10 sits above the overlay.
+  Native YouTube controls (volume, pause, fullscreen) inside the iframe are unreachable;
+  mute is handled via postMessage with enablejsapi=1 parameter.
+
+WHY createPortal FOR TRAIL DRAWER:
+  Story cards use CSS transform for video slide animation.
+  CSS transform creates a new containing block, so position:fixed children render relative
+  to the transformed element, not the viewport. createPortal escapes this hierarchy.
+
+WHY INLINE STYLES (not Tailwind/CSS modules):
+  Rapid iteration without needing class names. CSS variables handle theming.
+
+WHY HORIZONTAL SWIPE FOR CATEGORIES (not tabs):
+  Mobile-first. Swiping between categories feels natural. The 9-panel CSS transform
+  approach keeps all panels rendered (so no unmount/remount on channel switch),
+  which means expanded state persists across swipes.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL TECHNICAL GOTCHAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. CSS TRANSFORM CONTAINING BLOCK
+   If you wrap ANY fixed-position UI (modals, drawers, tooltips) inside a container that
+   has transform, filter, or will-change CSS, it will NOT be positioned relative to viewport.
+   Solution: always use createPortal to mount such elements directly in document.body.
+
+2. INTERSECTION OBSERVER + CSS TRANSFORM SCROLL SENTINELS
+   The 9-panel swipe layout uses CSS translateX on the outer container. Panels at different
+   horizontal positions only have their scroll sentinel intersect with viewport when visible.
+   One IntersectionObserver per panel works correctly because all panels are in DOM simultaneously.
+
+3. db.$count() IS UNRELIABLE (DRIZZLE DUPLICATE PACKAGE BUG)
+   Drizzle's $count() returns undefined when two drizzle-orm versions are installed.
+   Always use: db.select({ count: sql<number>`cast(count(*) as int)` }).from(table)
+   Then access: rows[0]?.count ?? 0
+
+4. FORCE-DYNAMIC REQUIRED FOR FEED ROUTES
+   Without export const dynamic = 'force-dynamic', Next.js caches the server component
+   output and serves stale HTML. All feed API routes and page.tsx use force-dynamic.
+
+5. YOUTUBE AUTOPLAY REQUIRES mute=1
+   Mobile browsers (iOS Safari, Chrome Android) block autoplay with sound.
+   Add mute=1&playsinline=1 to embed URL. Use postMessage API (enablejsapi=1) for custom mute toggle.
+   Without mute=1, the iframe shows a static thumbnail with the red YouTube play button.
+
+6. HYDRATION MISMATCH WITH INLINE THEME SCRIPT
+   layout.tsx has an inline script that reads localStorage and sets data-theme on <html>
+   before React hydrates. Fix: suppressHydrationWarning on the <html> element.
+
+7. overflow-anchor: none ON BODY
+   Without this, when a story card expands, browser scroll anchoring causes page to jump.
+   Disable with overflow-anchor: none on body in globals.css.
+
+8. PNPM WORKSPACES DRIZZLE DUPLICATE
+   drizzle-orm is installed in both apps/web/node_modules and packages/db/node_modules.
+   TypeScript sees two different class definitions. DOES NOT affect runtime. Safe to ignore.
+
+9. WINDOWS ESM DYNAMIC IMPORT PATH
+   On Windows, import(absolutePath) requires a file:// URL, not a raw path.
+   Use pathToFileURL() from 'url' module: await import(pathToFileURL(absolutePath).href)
+   (This was the fix for scripts/insert-wb-synth.mjs and scrape-wb-election.mjs)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WHAT HAS BEEN DONE (May 2026)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Completed in the May 2026 build sessions:
+
+✓ DB migration: SQLite → Neon PostgreSQL (Drizzle ORM, @neondatabase/serverless)
+✓ Feed sort by article published_at (correlated subquery, not cluster.created_at)
+✓ Infinite scroll fixed (db.$count() bug → raw SQL cast(count(*) as int))
+✓ force-dynamic on page.tsx and all feed routes (prevents stale HTML caching)
+✓ Phone layout: removed horizontal padding from <main> to fix edge overflow
+✓ Video swipe: left swipe from cover → video, right swipe from video → cover
+✓ Video no-lag: pre-fetches video list on card open, switches immediately
+✓ YouTube autoplay: mute=1&playsinline=1 (required for mobile browser autoplay)
+✓ Custom mute toggle: postMessage API button (z-index:10 above swipe overlay)
+✓ Splash screen: "For the People" h1 + "Cut the narratives..." subtitle + secondary line
+✓ Positive feed filter: NEGATIVE_WORDS blocklist prevents tragedies appearing as positive
+✓ Manual synthesis: 20 clusters synthesized inline (insert-synth.mjs + insert-synth-2.mjs)
+✓ West Bengal Election 2026: scraped 27 articles, synthesized (cluster 70e1e3d2422f30b5)
+✓ Auto pipeline: /api/cron/pipeline (ingest → cluster → Gemini synth, fires every minute)
+✓ vercel.json: cron config added
+✓ GEMINI_API_KEY updated to new synthesis key
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PENDING / TODO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+IMMEDIATE (must do before app is fully functional):
+  □ Add GEMINI_API_KEY to Vercel dashboard env vars
+    Value: AIzaSyAsDVIj1tC7uyMbIPu1iX28IxAbB3U9YKA
+  □ Verify CRON_SECRET is set in Vercel dashboard (auto-generated when crons deploy)
+  □ Confirm Vercel plan supports every-minute crons (Pro required); downgrade to hourly if on Hobby
+
+SHORT TERM (improve product quality):
+  □ Add synthesis-time category tagging (ask Gemini to output "categories": ["politics","finance"])
+    Store in synthesis JSON; use in /api/feed/category instead of title keyword matching
+  □ Add synthesis-time sentiment/tone field for better positive feed filtering
+  □ Fix starred panel to fetch starred clusters by ID from server (not just from loaded state)
+  □ Fix cover image N+1 queries (DISTINCT ON join instead of loop)
+  □ Add real-time push: SSE /api/feed/events to push new stories as cron synthesizes them
+
+MEDIUM TERM (meaningful improvements):
+  □ Hindi synthesis output (parallel summaries in Hindi for each narrative)
+  □ Share card: Vercel OG image generation per story
+  □ Politician profile page (/person/:name) aggregating all their appearances
+  □ Full-text search over synthesis content (PostgreSQL tsvector)
+  □ Embedding-based clustering (replace Jaccard with sentence embeddings for accuracy)
+  □ Rhetoric flags leaderboard (running count per politician)
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESIGN SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CSS Variables (globals.css):
+  --paper:       #f5f0e3  (parchment background)
+  --paper-alt:   #ede8d6  (slightly darker, for alternating sections)
+  --ink:         #1a1008  (near-black text)
+  --ink-muted:   #5a5040  (secondary text)
+  --ink-faint:   #9a9080  (metadata, timestamps)
+  --rule:        #ccc5b0  (light dividers)
+  --rule-heavy:  #8a8070  (section borders)
+  --red:         #8b0000  (right-heavy lean color, convicted status, rhetoric flags)
+  --navy:        #1a3560  (left-lean color)
+  --forest:      #1e3a1e  (positive/fact color, forest green)
+  --gold:        #8b6914  (alleged status, in-press indicator)
+
+Dark mode uses [data-theme="dark"] attribute on <html> with adjusted values.
+Toggle stored in localStorage as 'ftp-theme' ('dark'|'light').
+
+Typography:
+  Headings: Playfair Display (--font-playfair) — newspaper editorial feel
+  Body: Crimson Text (--font-crimson) — readable serif for long synthesis content
+  Labels/meta: 'Helvetica Neue', Arial (sans-serif) — .sc class (small caps style)
+
+The .sc class: font-size 0.65rem, font-weight 700, letter-spacing 0.1em, uppercase.
+Used for all metadata labels throughout the app.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HOW TO REBUILD FROM SCRATCH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. SETUP
+   - Node 20+, pnpm 9+
+   - Clone repo, run: pnpm install
+   - Create Neon PostgreSQL database (neon.tech, free tier)
+   - Copy pooler connection string to .env.local as DATABASE_URL
+   - Run: cd packages/db && npx drizzle-kit push (creates tables)
+   - Add to .env.local: GROQ_API_KEY, BRAVE_API_KEY, GEMINI_API_KEY, YOUTUBE_API_KEY
+
+2. POPULATE DATA (initial)
+   - pnpm --filter worker ingest:once          (30-60 min first run, 35+ RSS feeds)
+   - pnpm --filter worker cluster:once
+   - pnpm --filter worker synth:one            (repeat; Groq 100k/day limit applies)
+   - pnpm --filter worker link:once
+
+3. RUN UI
+   - cd apps/web && pnpm dev
+   - Open http://localhost:3000
+
+4. DEPLOY + AUTO PIPELINE
+   - Push to GitHub; Vercel auto-deploys on push to master
+   - Add GEMINI_API_KEY + CRON_SECRET to Vercel env vars
+   - Cron fires every minute: /api/cron/pipeline auto-ingests and synthesizes
+   - Monitor at: Vercel dashboard → Project → Cron Jobs tab
