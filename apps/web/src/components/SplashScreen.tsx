@@ -42,11 +42,25 @@ export function SplashScreen() {
         margin: 0,
         padding: '0 1.5rem',
       }}>
-        Cut the narratives.<br />See things for what they are.
+        For the People
       </h1>
       <p style={{
         fontFamily: 'var(--font-crimson)',
-        fontSize: 'clamp(0.75rem, 2vw, 0.9rem)',
+        fontSize: 'clamp(0.85rem, 2.5vw, 1.05rem)',
+        color: 'var(--ink)',
+        fontStyle: 'italic',
+        animation: 'splashIn 0.9s ease 0.3s forwards',
+        opacity: 0,
+        margin: '0.5rem 0 0',
+        textAlign: 'center',
+        letterSpacing: '0.01em',
+        padding: '0 1.5rem',
+      }}>
+        Cut the narratives. See things for what they are.
+      </p>
+      <p style={{
+        fontFamily: 'var(--font-crimson)',
+        fontSize: 'clamp(0.65rem, 1.8vw, 0.8rem)',
         color: 'var(--ink-faint)',
         fontStyle: 'italic',
         animation: 'splashIn 0.9s ease 0.5s forwards',

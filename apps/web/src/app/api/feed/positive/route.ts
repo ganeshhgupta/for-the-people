@@ -15,7 +15,25 @@ const POSITIVE_WORDS = new Set([
   'relief','aid','welfare','education','school','hospital','vaccine','cure',
 ]);
 
+// Any story whose title contains these words is excluded, even if it has common_ground
+const NEGATIVE_WORDS = new Set([
+  'death','deaths','dead','died','die','dying','kill','kills','killed','killing',
+  'murder','murders','murdered','suicide','poisoned','poison','poisoning',
+  'attack','attacks','attacked','blast','explosion','bomb','bombing','strike','strikes',
+  'violence','violent','riot','riots','crash','crashes','accident','accidents',
+  'tragedy','disaster','flood','earthquake','cyclone','hurricane','tornado',
+  'rape','assault','abuse','scam','fraud','corruption','scandal','arrested',
+  'war','battle','conflict','shooting','shot','stabbed','stabbing','fire',
+  'disease','outbreak','epidemic','pandemic','contaminated','toxic',
+]);
+
+function isNegativeTitle(title: string): boolean {
+  const words = title.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/);
+  return words.some(w => NEGATIVE_WORDS.has(w));
+}
+
 function isPositiveTitle(title: string): boolean {
+  if (isNegativeTitle(title)) return false;
   const words = title.toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/);
   return words.some(w => POSITIVE_WORDS.has(w));
 }
@@ -37,8 +55,10 @@ export async function GET(req: Request) {
   const allSynths = await db.select({ clusterId: syntheses.clusterId, output: syntheses.output }).from(syntheses);
   const synthMap = new Map(allSynths.map(s => [s.clusterId, s.output as Record<string, unknown>]));
 
-  // Filter: has common_ground in synthesis OR positive title keywords
+  // Filter: positive title keywords AND not a negative/tragedy story
+  // common_ground alone is not sufficient — tragedy stories can have common_ground proposals too
   const positive = allClusters.filter(c => {
+    if (isNegativeTitle(c.canonicalTitle)) return false;
     if (isPositiveTitle(c.canonicalTitle)) return true;
     const out = synthMap.get(c.id);
     if (!out) return false;
