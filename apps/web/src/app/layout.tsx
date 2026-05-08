@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, Crimson_Text } from 'next/font/google';
 import './globals.css';
+import { SplashScreen } from '../components/SplashScreen';
 
 const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-playfair', display: 'swap' });
 const crimson  = Crimson_Text({ subsets: ['latin'], weight: ['400', '600'], style: ['normal', 'italic'], variable: '--font-crimson', display: 'swap' });
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         ` }} />
       </head>
       <body suppressHydrationWarning>
+        <SplashScreen />
         <main style={{ maxWidth: '760px', margin: '0 auto', padding: '0 1rem 5rem' }}>
           {children}
         </main>
