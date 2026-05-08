@@ -26,15 +26,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@ftp/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@ftp/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@neondatabase/serverless':
         specifier: ^0.10.4
         version: 0.10.4
-      '@tristhana/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@tristhana/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@neondatabase/serverless@0.10.4)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(@types/react@19.2.14)(better-sqlite3@12.9.0)(pg@8.20.0)(react@19.2.6)
@@ -63,15 +63,15 @@ importers:
 
   apps/worker:
     dependencies:
+      '@ftp/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@ftp/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@neondatabase/serverless':
         specifier: ^0.10.4
         version: 0.10.4
-      '@tristhana/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@tristhana/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
