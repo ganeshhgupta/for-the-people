@@ -89,7 +89,7 @@ async function generateCanonicalTitle(titles: string[]): Promise<string> {
   }
 }
 
-async function main() {
+export async function runCluster(): Promise<number> {
   console.log('Loading unclustered articles…');
   const rows = await db.select({
     id: articles.id,
@@ -99,12 +99,12 @@ async function main() {
   }).from(articles).where(isNull(articles.clusterId));
 
   console.log(`  ${rows.length} unclustered articles`);
-  if (rows.length === 0) { console.log('Nothing to cluster.'); process.exit(0); }
+  if (rows.length === 0) { console.log('Nothing to cluster.'); return 0; }
 
   const clusterMap = clusterArticles(rows);
   console.log(`  Formed ${clusterMap.size} clusters`);
 
-  let clustered = 0;
+  let newClusters = 0;
   for (const [clusterId, members] of clusterMap) {
     const canonicalTitle = await generateCanonicalTitle(members.map((m) => m.title));
     const fingerprint = members.map((a) => a.id).sort().join(',');
@@ -121,13 +121,18 @@ async function main() {
       await db.update(articles).set({ clusterId }).where(eq(articles.id, member.id));
     }
 
-    clustered += members.length;
+    newClusters++;
     console.log(`  Cluster [${clusterId}]: "${canonicalTitle}" (${members.length} articles)`);
   }
 
-  const [row] = await db.select({ count: sql<number>`count(*)` }).from(clusters);
-  console.log(`\nDone. Clustered ${clustered} articles into ${clusterMap.size} new clusters · DB total: ${row?.count ?? 0}`);
-  process.exit(0);
+  return newClusters;
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Standalone entry point
+if (process.argv[1]?.endsWith('cluster.ts') || process.argv[1]?.endsWith('cluster.js')) {
+  runCluster().then(async (n) => {
+    const [row] = await db.select({ count: sql<number>`count(*)` }).from(clusters);
+    console.log(`\nDone. ${n} new clusters · DB total: ${row?.count ?? 0}`);
+    process.exit(0);
+  }).catch((e) => { console.error(e); process.exit(1); });
+}

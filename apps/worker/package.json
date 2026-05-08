@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "pipeline": "tsx src/index.ts",
     "ingest:once": "tsx src/ingest.ts",
     "cluster:once": "tsx src/cluster.ts",
     "synth:one": "tsx src/synth.ts",

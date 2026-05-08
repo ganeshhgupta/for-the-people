@@ -128,24 +128,27 @@ async function synthesizeCluster(clusterId: string): Promise<void> {
   console.log(`  Done: ${clusterId}`);
 }
 
-async function main() {
-  const targetClusterId = process.argv[2];
-
-  if (targetClusterId) {
-    await synthesizeCluster(targetClusterId);
-  } else {
-    const pending = await db.select({ id: clusters.id }).from(clusters).where(eq(clusters.status, 'pending'));
-    console.log(`Synthesizing ${pending.length} pending clusters…`);
-    for (const { id } of pending) {
-      try {
-        await synthesizeCluster(id);
-      } catch (err) {
-        console.error(`  Error on ${id}:`, (err as Error).message);
-      }
+export async function runSynth(limit = Infinity): Promise<number> {
+  const pending = await db.select({ id: clusters.id }).from(clusters).where(eq(clusters.status, 'pending'));
+  const batch = pending.slice(0, limit === Infinity ? undefined : limit);
+  console.log(`Synthesizing ${batch.length} of ${pending.length} pending clusters…`);
+  let done = 0;
+  for (const { id } of batch) {
+    try {
+      await synthesizeCluster(id);
+      done++;
+    } catch (err) {
+      console.error(`  Error on ${id}:`, (err as Error).message);
     }
   }
-
-  process.exit(0);
+  return done;
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Standalone entry point
+if (process.argv[1]?.endsWith('synth.ts') || process.argv[1]?.endsWith('synth.js')) {
+  const targetId = process.argv[2];
+  const work = targetId
+    ? synthesizeCluster(targetId)
+    : runSynth();
+  work.then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
+}

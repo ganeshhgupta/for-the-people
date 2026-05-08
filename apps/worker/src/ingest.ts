@@ -162,7 +162,7 @@ async function ingestGuardian(): Promise<number> {
   return total;
 }
 
-async function main() {
+export async function runIngest(): Promise<number> {
   let total = 0;
 
   // ── RSS feeds ──
@@ -190,9 +190,14 @@ async function main() {
   console.log(`${g} articles`);
   total += g;
 
-  const [row] = await db.select({ count: sql<number>`count(*)` }).from(articles);
-  console.log(`\nDone. ${total} new · DB total: ${row?.count ?? 0}`);
-  process.exit(0);
+  return total;
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Standalone entry point
+if (process.argv[1]?.endsWith('ingest.ts') || process.argv[1]?.endsWith('ingest.js')) {
+  runIngest().then(async (total) => {
+    const [row] = await db.select({ count: sql<number>`count(*)` }).from(articles);
+    console.log(`\nDone. ${total} new · DB total: ${row?.count ?? 0}`);
+    process.exit(0);
+  }).catch((e) => { console.error(e); process.exit(1); });
+}
