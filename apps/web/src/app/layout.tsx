@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${playfair.variable} ${crimson.variable}`}>
+    <html lang="en" className={`${playfair.variable} ${crimson.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: `
           try { var t=localStorage.getItem('ftp-theme'); if(t) document.documentElement.setAttribute('data-theme',t); } catch(e){}

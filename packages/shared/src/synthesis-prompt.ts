@@ -75,9 +75,24 @@ Respond with ONLY a valid JSON object matching this exact structure:
   "established_facts": [{"claim": string, "tier": 1, "citations": [string]}],
   "reported_facts": [{"claim": string, "tier": 2, "citations": [string]}],
   "contested_claims": {
-    "right_narrative": {"summary": string, "key_claims": [{"claim": string, "citations": [string]}], "framing_devices": [string], "sources_used": [string]},
-    "left_narrative": {"summary": string, "key_claims": [{"claim": string, "citations": [string]}], "framing_devices": [string], "sources_used": [string]},
-    "other_narrative": {"summary": string, "key_claims": [{"claim": string, "citations": [string]}], "framing_devices": [string], "sources_used": [string]} | null
+    "right_narrative": {
+      "summary": "4-6 sentences. Cover ALL of: (1) the core argument this side makes, (2) the historical/political background they emphasize to justify their position, (3) the motivation or grievance they attribute to the opposing side, (4) their reasoning chain — why this event means what they say it means, (5) how they frame the stakes and who they say is harmed. Write this as a substantive explanation, not a headline.",
+      "key_claims": [{"claim": string, "citations": [string]}],
+      "framing_devices": [string],
+      "sources_used": [string]
+    },
+    "left_narrative": {
+      "summary": "4-6 sentences. Cover ALL of: (1) the core argument this side makes, (2) the historical/political background they emphasize to justify their position, (3) the motivation or grievance they attribute to the opposing side, (4) their reasoning chain — why this event means what they say it means, (5) how they frame the stakes and who they say is harmed. Write this as a substantive explanation, not a headline.",
+      "key_claims": [{"claim": string, "citations": [string]}],
+      "framing_devices": [string],
+      "sources_used": [string]
+    },
+    "other_narrative": {
+      "summary": "4-6 sentences. Cover ALL of: (1) the core argument this side makes, (2) the historical/political background they emphasize to justify their position, (3) the motivation or grievance they attribute to the opposing side, (4) their reasoning chain — why this event means what they say it means, (5) how they frame the stakes and who they say is harmed. Write this as a substantive explanation, not a headline.",
+      "key_claims": [{"claim": string, "citations": [string]}],
+      "framing_devices": [string],
+      "sources_used": [string]
+    } | null
   },
   "named_individuals": [{"name": string, "role": string, "party_or_affiliation": string, "procedural_status": "TIER_1_CONVICTED"|"TIER_2_CHARGED"|"TIER_3_ALLEGED"|"PROCEDURAL_BARRIERS_NOTED", "specific_acts": [string], "status_evidence": [{"fact": string, "citation": string}], "procedural_barriers": [{"fact": string, "citation": string}] | null}],
   "precedents_cited_by_right": [{"event": string, "year": number, "citing_outlets": [string]}],

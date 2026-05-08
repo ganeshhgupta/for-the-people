@@ -1,0 +1,673 @@
+TRISTHANA / FOR THE PEOPLE — COMPLETE APP GUIDE
+================================================
+Written: May 2026
+Purpose: Enable a fresh Claude session to rebuild this app end-to-end from scratch,
+         understand current state, known bugs, and roadmap.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+VISION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+"For the People" is an Indian news synthesis app that shows you the same news story
+through multiple political lenses simultaneously — right, left, and centre — without
+telling you what to think.
+
+The core insight: Indian media is deeply politically polarized. OpIndia and The Wire
+cover the same event as if they happened on different planets. Rather than pretending
+neutrality (which is itself a political position), this app:
+
+  1. Ingests articles from 35+ sources across the Indian political spectrum
+  2. Clusters articles about the same real-world event
+  3. Runs a synthesis through Claude (Anthropic) that produces a structured JSON with:
+     - Established facts (adjudicated by courts, official records)
+     - Reported facts (3+ sources, 2+ lean buckets within 24h)
+     - Contested claims: right narrative, left narrative, other narrative
+     - Named individuals with procedural status (convicted/charged/alleged)
+     - Rhetoric flags (red herrings, broken promises, evasion, factual falsehoods)
+     - Statistics with source citations
+     - Common ground proposals or irreconcilable disagreements
+  4. Presents all of this in a newspaper-aesthetic mobile UI
+
+The app is NOT a neutral aggregator. It actively applies epistemological rules to
+distinguish facts from narratives. It names names. It flags politicians' lies equally
+regardless of party.
+
+Target user: Indians who are tired of consuming only one side's reality bubble.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REPO STRUCTURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+tristhana/                         ← monorepo root (pnpm workspaces)
+├── apps/
+│   ├── web/                       ← Next.js 15 app (deployed on Vercel)
+│   │   ├── src/
+│   │   │   ├── app/
+│   │   │   │   ├── page.tsx       ← Server component: fetches initial clusters, renders StoryFeed
+│   │   │   │   ├── layout.tsx     ← Root layout: fonts (Playfair Display, Crimson Text), theme
+│   │   │   │   ├── globals.css    ← CSS variables (light/dark themes), utility classes
+│   │   │   │   └── api/
+│   │   │   │       ├── feed/
+│   │   │   │       │   ├── route.ts              ← GET /api/feed — main chronological feed
+│   │   │   │       │   ├── positive/route.ts     ← GET /api/feed/positive — filtered for positive stories
+│   │   │   │       │   └── category/route.ts     ← GET /api/feed/category?cat=sports — keyword-filtered
+│   │   │   │       └── story/[id]/
+│   │   │   │           ├── route.ts              ← GET /api/story/:id — synthesis + articles for a cluster
+│   │   │   │           ├── reasons/route.ts      ← GET — linked clusters (shared entities)
+│   │   │   │           ├── trail/route.ts        ← GET SSE stream — AI causal trail builder
+│   │   │   │           ├── chat/route.ts         ← POST — stream chat about story context
+│   │   │   │           ├── videos/route.ts       ← GET — YouTube video search
+│   │   │   │           └── reels/route.ts        ← GET — (placeholder)
+│   │   │   ├── components/
+│   │   │   │   ├── StoryFeed.tsx  ← Main client component: all UI logic (1000+ lines)
+│   │   │   │   └── TrailDrawer.tsx ← Slide-up drawer for causal trail + chat (portal-rendered)
+│   │   │   └── lib/
+│   │   │       └── db.ts          ← Singleton Drizzle client for Neon PostgreSQL
+│   │   ├── .env.local             ← DATABASE_URL, GROQ_API_KEY, BRAVE_API_KEY, YOUTUBE_API_KEY
+│   │   └── vercel.json            ← rootDirectory: apps/web
+│   │
+│   └── worker/                    ← Node.js worker: ingest → cluster → synthesize
+│       └── src/
+│           ├── ingest.ts          ← Fetches RSS feeds, extracts article text, stores in DB
+│           ├── cluster.ts         ← Groups articles into story clusters (shared entities/keywords)
+│           ├── synth.ts           ← Calls Claude API to synthesize each cluster
+│           ├── link.ts            ← Creates cluster_links (shared entities between clusters)
+│           └── index.ts           ← CLI entry: pnpm ingest:once / cluster:once / synth:one
+│
+├── packages/
+│   ├── db/                        ← Drizzle ORM schema + migrations
+│   │   └── src/
+│   │       ├── schema.ts          ← Tables: clusters, articles, syntheses, trails, cluster_links
+│   │       ├── client.ts          ← Neon PostgreSQL connection via @neondatabase/serverless
+│   │       └── migrate.ts         ← pnpm db:migrate
+│   └── shared/                    ← Types and prompts shared between web and worker
+│       └── src/
+│           ├── schemas.ts         ← Zod schema for SynthesisOutput (the Claude JSON output)
+│           ├── synthesis-prompt.ts ← The 100-line system prompt + user message builder
+│           └── sources.ts         ← All 35+ news sources with lean, factuality, notes
+
+pnpm-workspace.yaml                ← Workspace definition
+vercel.json                        ← { "rootDirectory": "apps/web" }
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DATABASE SCHEMA (Neon PostgreSQL via Drizzle ORM)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+clusters
+  id              text PK
+  canonical_title text
+  story_fingerprint text
+  status          text  ('pending' | 'synthesized')
+  article_count   int
+  created_at      timestamp
+  updated_at      timestamp
+
+articles
+  id              text PK
+  source_id       text  (references SOURCES array id)
+  url             text UNIQUE
+  title           text
+  published_at    timestamp
+  body_excerpt    text
+  image_url       text nullable
+  cluster_id      text FK → clusters.id nullable
+  ingested_at     timestamp
+
+syntheses
+  id              text PK
+  cluster_id      text UNIQUE FK → clusters.id
+  output          jsonb  (SynthesisOutput object)
+  created_at      timestamp
+
+trails
+  id              text PK
+  cluster_id      text UNIQUE FK → clusters.id
+  nodes           jsonb  (causal trail nodes)
+  created_at      timestamp
+
+cluster_links
+  id              text PK
+  from_cluster_id text FK → clusters.id
+  to_cluster_id   text FK → clusters.id
+  shared_entities text  (JSON array of entity names)
+  created_at      timestamp
+  UNIQUE(from_cluster_id, to_cluster_id)
+
+MIGRATION: Originally SQLite (tristhana.db in repo root, still present but unused).
+Migrated to Neon PostgreSQL (serverless). Migration script at packages/db/src/migrate-data.ts.
+DATABASE_URL env var points to Neon connection string.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WORKER PIPELINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run from tristhana/apps/worker/:
+
+  pnpm --filter worker ingest:once
+    → Fetches all 35+ RSS feeds
+    → For each new article: scrapes body text, extracts image, stores in articles table
+
+  pnpm --filter worker cluster:once
+    → Takes unclustered articles
+    → Groups by shared named entities (people, orgs, places) and keyword similarity
+    → Creates/updates cluster rows, sets canonical_title
+    → Links articles to clusters
+
+  pnpm --filter worker synth:one
+    → Takes ONE 'pending' cluster
+    → Builds synthesis prompt with all cluster articles
+    → Calls Claude API (claude-opus-4-7 or claude-sonnet-4-6)
+    → Parses JSON response against SynthesisOutput Zod schema
+    → Stores in syntheses table, marks cluster as 'synthesized'
+    → Run this repeatedly; Groq rate limit (100k tokens/day on free tier) is the bottleneck
+
+  pnpm --filter worker link:once
+    → Scans synthesized clusters for shared named entities
+    → Creates cluster_links rows for story graph navigation
+
+Typical workflow for fresh data:
+  1. pnpm --filter worker ingest:once
+  2. pnpm --filter worker cluster:once
+  3. Repeat: pnpm --filter worker synth:one (until Groq rate limit hit or all done)
+  4. pnpm --filter worker link:once
+
+NOTE: As of May 2026, ~48 clusters remained in 'pending' status waiting for synthesis
+(Groq daily token limit hit). Run synth:one repeatedly over following days to clear backlog.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SYNTHESIS PROMPT (The core epistemology)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Located at: packages/shared/src/synthesis-prompt.ts
+
+The prompt enforces three tiers of factual confidence:
+  Tier 1: Adjudicated facts (courts, official commissions, RTI, autopsy reports)
+  Tier 2: Reported facts (3+ outlets, 2+ lean buckets, within 24h)
+  Tier 3: Contested claims (motive, blame, sequence — diverge by lean)
+
+Key rules:
+  - Name individuals; never anonymize when sources have named them
+  - Apply identical language for identical procedural status regardless of party/religion
+  - "Convicted of rape" not "convicted in a sexual offense matter"
+  - Don't construct causal chains — extract which prior events each SIDE'S outlets invoked
+  - Flag RED_HERRING, BROKEN_PROMISE, EVASION, THREAT, FACTUAL_FALSEHOOD for all parties
+  - Never invent statistics; empty array beats fabricated entry
+  - Counterweight LLM liberal bias when constructing right_narrative (steelman from sources)
+  - model_uncertainty_notes is required, never empty
+
+Output JSON schema (simplified):
+  {
+    story_age_band: "breaking"|"developing"|"mature"|"historical",
+    established_facts: [{claim, tier: 1, citations}],
+    reported_facts: [{claim, tier: 2, citations}],
+    contested_claims: {
+      right_narrative: {summary (4-6 sentences), key_claims, framing_devices, sources_used},
+      left_narrative: {same},
+      other_narrative: {same} | null
+    },
+    named_individuals: [{name, role, party, procedural_status, specific_acts, status_evidence}],
+    precedents_cited_by_right/left/other: [{event, year, citing_outlets}],
+    rhetoric_flags: [{type, leader_name, party, quoted_statement, context, contradicting_fact}],
+    statistics: [{claim, value, unit, year, source_authority, self_confidence}],
+    common_ground: [{proposal, why_right_accept, why_left_accept, why_fail}] | null,
+    irreconcilable_disagreements: [string],
+    model_uncertainty_notes: string
+  }
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NEWS SOURCES (35+ outlets)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+RIGHT HEAVY: OpIndia, Swarajya, Organiser (RSS), TFI Post, Republic World, Zee News, India TV, Hindu Post
+RIGHT LEAN:  Daily Pioneer, Economic Times, News18, Firstpost, WION
+CENTRE:      The Hindu, Indian Express, Hindustan Times, Times of India, NDTV, The Print, India Today,
+             Mint, Business Standard, Financial Express, Deccan Herald, New Indian Express,
+             DNA India, Moneycontrol, Tribune India
+LEFT LEAN:   Scroll.in, The Quint, Newslaundry, The News Minute, Newsclick, The Citizen
+LEFT HEAVY:  The Wire, The Caravan, Frontline
+WIRE:        ANI (dominant wire service; note: NOT neutral — documented pro-government bias)
+
+Source metadata includes: lean, factuality (high/mostly/mixed/low), and detailed notes on
+editorial history, ownership, known biases, and specific documented failures.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+UI ARCHITECTURE (StoryFeed.tsx)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tech: Next.js 15, React, pure inline styles (no CSS-in-JS library), Playfair Display + Crimson Text fonts.
+Design: Indian newspaper aesthetic — sepia paper, ink colors, Playfair headings, Crimson body text.
+
+LAYOUT:
+  - Sticky masthead: title "For the People" + video mode toggle (left) + profile icon (right)
+  - Scrollable channel tabs in masthead: All News, Positive, Sports, Entertainment, Finance, Tech, Travel, Art, Politics
+  - Swipe container: 9-panel horizontal layout, CSS transform for sliding
+  - Fixed bottom nav (58px): Filters | Starred | [Positive News center button] | Search | Collapse
+
+STORY CARD:
+  - Cover image (full-bleed) OR YouTube video (swipe left/right to switch between media)
+  - Headline + date + source count + star button
+  - On expand: fact bar (% factual vs disputed) + AI trail button (4-pointed star icon)
+  - Facts section: green bullets for established/reported facts
+  - POVs section: POV1/POV2/POV3 with collapse/expand chevron
+    - Collapsed: first 160 chars of summary
+    - Expanded: full summary + key_claims bullets + framing_devices tags
+  - People section: named individuals with procedural status badges
+  - Rhetoric flags: red-left-bordered with flag type + leader + quoted statement
+  - Statistics: grid layout with large numbers
+  - Sources: thumbnail + outlet name + lean label + published date + external link
+
+CHANNEL FEEDS (9 swipeable):
+  main          → /api/feed                           (all synthesized stories, chrono)
+  good          → /api/feed/positive                  (keyword + common_ground filter)
+  sports        → /api/feed/category?cat=sports       (keyword filter per category)
+  entertainment → /api/feed/category?cat=entertainment
+  finance       → /api/feed/category?cat=finance
+  tech          → /api/feed/category?cat=tech
+  travel        → /api/feed/category?cat=travel
+  art           → /api/feed/category?cat=art
+  politics      → /api/feed/category?cat=politics
+
+OVERLAY PANELS (via bottom nav):
+  Search  → SearchPanel: text input, client-side filter over all loaded clusters
+  Starred → StarredPanel: stories starred via localStorage; star button on each card
+  Filters → FiltersPanel: placeholder ("coming soon")
+
+PROFILE DRAWER (top-right icon):
+  - Slide-in from right
+  - Night mode toggle (dark/light theme via CSS [data-theme="dark"])
+  - Auto-play videos toggle (localStorage: ftp-videomode)
+
+TRAIL DRAWER (4-star AI button in fact bar):
+  - Portal-rendered (createPortal to document.body) — CRITICAL to escape transform containing block
+  - SSE stream from /api/story/:id/trail (Server-Sent Events)
+  - Uses Groq LLaMA-3.3-70b with Brave Search tool calls to build causal trail
+  - Expandable branch nodes (⊕ N branches)
+  - Chat input: POST /api/story/:id/chat for follow-up questions
+
+VIDEO SWIPE:
+  - Cover photo → swipe left → YouTube video → swipe left → next video (circular)
+  - Each card has independent video state
+  - Auto-play when videoMode is on and card expands
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ENVIRONMENT VARIABLES (.env.local in apps/web/)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+DATABASE_URL       ← Neon PostgreSQL connection string (required)
+GROQ_API_KEY       ← For trail builder (LLaMA-3.3-70b) and story chat
+                      Free tier: 100,000 tokens/day — the main bottleneck for synthesis
+BRAVE_API_KEY      ← BSAnsUq8Vavug2NYodu0FVL0duaxJYj  (for trail web search)
+YOUTUBE_API_KEY    ← Optional; video search disabled without it
+ANTHROPIC_API_KEY  ← For synthesis (worker) — Claude API
+
+Note: Worker uses a separate .env at apps/worker/.env (or root .env).
+      Web API routes use apps/web/.env.local.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+KNOWN BUGS AND ISSUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. DRIZZLE DUPLICATE PACKAGE TYPESCRIPT ERRORS (non-blocking)
+   Location: apps/web/src/app/api/feed/route.ts, positive/route.ts, category/route.ts
+   Symptom: TypeScript errors about incompatible PgColumn types, "separate declarations of
+            private property 'shouldInlineParams'"
+   Cause: pnpm installs two versions of drizzle-orm (one for web, one for db package)
+          with slightly different internal types. The duplicate comes from the packages/db
+          package having its own drizzle-orm install alongside apps/web's.
+   Fix needed: Add pnpm overrides in root package.json to force single drizzle-orm version:
+     "pnpm": { "overrides": { "drizzle-orm": "0.38.4" } }
+   Status: App runs fine at runtime; only affects TypeScript compilation output.
+   Workaround: ESLint is skipped during Vercel build (SKIP_LINT=1 in vercel.json).
+
+2. SYNTHESIS BACKLOG (~48 pending clusters as of May 2026)
+   Cause: Groq free tier 100k tokens/day limit hit during batch synthesis run.
+   Fix: Run `pnpm --filter worker synth:one` repeatedly across multiple days.
+   Note: Each synthesis uses ~3,000-8,000 tokens depending on article count.
+
+3. POSITIVE NEWS FILTER IS ROUGH
+   The /api/feed/positive route uses keyword matching on titles + checks for common_ground
+   in synthesis JSON. Many truly positive stories don't match. Improvement needed:
+   → Add a "sentiment" or "tone" field to syntheses, populated by Claude during synthesis.
+   → Or run a lightweight classifier on synthesis output post-synthesis.
+
+4. CATEGORY FEEDS USE TITLE-ONLY KEYWORD MATCHING
+   The /api/feed/category route only matches keywords in canonical_title.
+   Better: also match against synthesis.established_facts text and article titles.
+   Even better: tag clusters with categories during synthesis (add "categories" field to schema).
+
+5. NO DEDUPLICATION ACROSS CATEGORY FEEDS
+   A story about "cricket corruption finance" appears in both Sports and Finance feeds.
+   This is by design for now but may confuse users.
+
+6. TRAIL BUILDER GROQ RATE LIMIT
+   The trail API (/api/story/:id/trail) uses Groq LLaMA-3.3-70b.
+   Free tier: 100k tokens/day, shared with synthesis worker.
+   If both are running simultaneously, they compete for quota.
+   Fix: Use separate API keys, or implement queuing/backoff.
+
+7. STARRED PANEL SHOWS ONLY ALREADY-LOADED CLUSTERS
+   If a user stars a story, closes the app, reopens it, and the starred cluster hasn't been
+   loaded yet by infinite scroll, it won't appear in the Starred panel.
+   Fix: Fetch starred clusters by ID from server when opening Starred panel.
+   API needed: GET /api/clusters/batch?ids=id1,id2,id3
+
+8. SWIPE NAVIGATION AND STORY EXPAND STATE
+   expandedId is global across all channels. Expanding a story on Politics then switching to
+   Sports and back shows the same story expanded. This is minor but suboptimal UX.
+   Fix: Per-channel expandedId map.
+
+9. CLUSTER COVER IMAGES ARE FETCHED ONE-BY-ONE
+   /api/feed fetches imageUrl per cluster in a loop (N queries for N clusters).
+   Fix: JOIN articles on cluster_id, take first non-null image per cluster.
+   SQL: SELECT DISTINCT ON (cluster_id) cluster_id, image_url FROM articles WHERE image_url IS NOT NULL
+
+10. POSSIBLE REASONS (RELATED STORIES) SECTION
+    The PossibleReasons component and /api/story/:id/reasons endpoint work but:
+    - Shared entity matching is crude (string overlap, not NER)
+    - No UI discoverability — only visible after expanding a story
+    - Recursive display (depth 4) can get slow for heavily-linked stories
+
+11. NO REAL-TIME UPDATES
+    The auto-refresh only polls every 30 seconds for pending→synthesized status changes.
+    No WebSocket or SSE push for new stories. Users must reload to see new ingests.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DEPLOYMENT (Vercel)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+vercel.json (at repo root):
+  { "rootDirectory": "apps/web" }
+
+Build command: next build (with SKIP_LINT=1 to avoid Drizzle TS errors blocking build)
+Output: .next/
+
+Environment variables set in Vercel dashboard:
+  DATABASE_URL, GROQ_API_KEY, BRAVE_API_KEY, YOUTUBE_API_KEY (optional), ANTHROPIC_API_KEY
+
+To deploy:
+  git push origin master
+  (Vercel auto-deploys on push to master)
+
+Or manually:
+  cd apps/web && npx vercel --prod
+
+Note: Worker (ingest/cluster/synth) is NOT deployed to Vercel — it's a local CLI tool
+that runs on the developer's machine to populate the database. This is by design:
+the pipeline is manual/cron, not always-on.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ARCHITECTURE DECISIONS & WHY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHY NEON POSTGRESQL (not SQLite):
+  SQLite worked locally but Vercel serverless functions can't persist a SQLite file.
+  Neon provides serverless PostgreSQL with HTTP-based connection (no TCP pool needed).
+  @neondatabase/serverless driver works in Vercel Edge/Node environments.
+
+WHY DRIZZLE ORM:
+  Type-safe, Neon-compatible, minimal bundle size. Zod integration for schema validation.
+
+WHY GROQ FOR TRAIL BUILDER (not Claude):
+  The trail builder makes many tool calls (Brave search) in a single session.
+  Groq's LLaMA-3.3-70b is fast and free, appropriate for the agentic loop.
+  Claude is used for the higher-quality synthesis (more expensive, better reasoning).
+
+WHY createPortal FOR TRAIL DRAWER:
+  The story cards use CSS transform for the video slide animation.
+  CSS transform creates a new containing block, so position:fixed children inside it
+  are positioned relative to the transformed element, not the viewport.
+  createPortal(content, document.body) escapes the transform hierarchy entirely.
+  Without this, the drawer renders off-screen or gets clipped.
+
+WHY INLINE STYLES (not Tailwind/CSS modules):
+  Rapid iteration without needing class names. CSS variables (--ink, --paper, etc.)
+  handle theming. The downside is verbose JSX but the design is simple enough.
+
+WHY HORIZONTAL SWIPE FOR CATEGORIES (not tabs):
+  Mobile-first. Swiping between categories feels natural. The 9-panel CSS transform
+  approach keeps all panels rendered (so no unmount/remount on channel switch),
+  which means expanded state persists across swipes.
+
+WHY SERVER COMPONENTS FOR INITIAL LOAD:
+  page.tsx is a React Server Component that fetches initial clusters from Neon directly.
+  This gives fast initial paint with real data, no loading spinner on first visit.
+  The StoryFeed component is 'use client' and takes over from there.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRITICAL TECHNICAL GOTCHAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. CSS TRANSFORM CONTAINING BLOCK
+   If you wrap ANY fixed-position UI (modals, drawers, tooltips) inside a container that
+   has transform, filter, or will-change CSS, it will NOT be positioned relative to viewport.
+   Solution: always use createPortal to mount such elements directly in document.body.
+
+2. INTERSECTION OBSERVER + CSS TRANSFORM SCROLL SENTINELS
+   The 9-panel swipe layout uses CSS translateX on the outer container. Panels laid out
+   at different horizontal positions (panel 1 at x=0, panel 2 at x=viewport_width, etc.)
+   will only have their scroll sentinel intersect with the viewport when they are the
+   currently visible panel. This is why one IntersectionObserver per panel works correctly
+   even though all panels are in the DOM simultaneously.
+
+3. scrollIntoView INSIDE position:fixed SCROLLS THE DOCUMENT
+   In Chrome, calling element.scrollIntoView() inside a position:fixed container
+   walks up the DOM tree and scrolls the first scrollable ancestor — which may be the
+   document body. Always guard with a "has content" check before calling scrollIntoView.
+   (Fixed in TrailDrawer: if (messages.length === 0) return;)
+
+4. HYDRATION MISMATCH WITH INLINE THEME SCRIPT
+   layout.tsx has an inline script that reads localStorage and sets data-theme on <html>
+   before React hydrates. This causes React to see a mismatch between server HTML (no
+   data-theme attr) and client HTML (data-theme="dark"). Fix: suppressHydrationWarning
+   on the <html> element.
+
+5. overflow-anchor: none ON BODY
+   Without this, when a story card expands (adding content to the DOM), the browser's
+   scroll anchoring tries to maintain visual position of already-visible content by
+   scrolling down. This causes the page to jump when cards expand. Disable with
+   overflow-anchor: none on body in globals.css.
+
+6. PNPM WORKSPACES DRIZZLE DUPLICATE
+   The pnpm monorepo structure causes drizzle-orm to be installed in both node_modules
+   (root) and packages/db/node_modules. TypeScript sees two different class definitions
+   for the same column type, causing private property incompatibility errors.
+   This does NOT affect runtime. Fix by adding pnpm overrides to force single version.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FUTURE ADDITIONS (prioritized)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+HIGH PRIORITY (would meaningfully improve the product):
+
+1. CATEGORIES IN SYNTHESIS
+   During synthesis, ask Claude to tag the cluster with 1-3 categories from a fixed list.
+   Store in syntheses.output.categories array. Use for category feed filtering instead of
+   title-only keyword matching. This would make category feeds much more accurate.
+
+2. NOTIFICATIONS / PUSH
+   When a new story matching user's starred topics is synthesized, send push notification.
+   Requires: PWA service worker + push subscription + backend notification job.
+
+3. REAL-TIME SYNTHESIS STATUS
+   Currently user has to reload to see newly synthesized stories.
+   Better: SSE stream from /api/feed/events that pushes new stories as they're synthesized.
+
+4. HINDI UI
+   ~40% of India reads Hindi. The synthesis could produce parallel Hindi summaries.
+   Just add a "hi" version of each narrative summary to the synthesis output schema.
+
+5. SHARE CARD
+   "Share this story" generates a preview card image showing the fact bar + key POVs.
+   Use Vercel OG (satori) to generate dynamic Open Graph images per story.
+
+6. FACT BAR EXPLAINER
+   Users don't immediately understand what "47% factual · 53% disputed" means.
+   Add a tap/click tooltip explaining the scoring methodology.
+
+7. STARRED STORIES PERSISTENCE (SERVER-SIDE)
+   Currently starred IDs are in localStorage only. Add user accounts (anonymous or OAuth)
+   to persist starred stories server-side, enabling cross-device sync.
+
+8. SEARCH OVER SYNTHESIS CONTENT
+   Current search only matches cluster canonical titles.
+   Better: full-text search over synthesis.established_facts, synthesis.reported_facts,
+   and article titles. Use PostgreSQL full-text search (tsvector/tsquery).
+
+9. TIMELINE VIEW
+   Show stories in a timeline ordered by story_age_band (breaking → developing → mature).
+   Help users understand which stories are still evolving vs settled.
+
+10. POLITICIAN / PERSON PROFILE PAGE
+    Named individuals appear in many stories. A person page (/person/:name) would aggregate
+    all their appearances across synthesis outputs — their factual record, rhetoric flags,
+    procedural status across different stories.
+
+MEDIUM PRIORITY:
+
+11. AUTOMATED DAILY INGEST CRON
+    Currently manual CLI. Set up a GitHub Actions or Vercel Cron job to run ingest/cluster/
+    synth automatically every 6 hours. Requires migrating worker to HTTP-triggered function
+    or deploying as a separate cron service (Railway, Fly.io, etc.)
+
+12. SOURCE CREDIBILITY SCORES IN UI
+    The source factuality (high/mostly/mixed/low) metadata exists but isn't shown to users.
+    Show a small credibility indicator next to each source in the Sources section.
+
+13. IMPROVE CLUSTERING ALGORITHM
+    Current clustering uses crude keyword/entity overlap. Many related stories aren't linked;
+    some unrelated stories get grouped. Better: use embeddings (sentence-transformers or
+    text-embedding-3-small from OpenAI) for semantic similarity clustering.
+
+14. RHETORIC FLAGS DATABASE
+    Build a running record of which politicians have been flagged how many times.
+    "Modi has been flagged 12 times for EVASION this month." This is powerful accountability.
+
+15. STORY TRAIL CACHING
+    Trail builder results (SSE stream output) are currently cached in the trails table.
+    But the cache isn't always consulted before re-running. Fix the cache read logic.
+
+LOW PRIORITY / NICE TO HAVE:
+
+16. FILTERS PANEL IMPLEMENTATION
+    Currently shows "coming soon". Implement:
+    - Filter by source lean (show only centre sources, etc.)
+    - Filter by date range
+    - Filter by story age band
+    - Filter by presence of rhetoric flags
+
+17. ANIMATIONS / MICROINTERACTIONS
+    The POV chevron expand, story card expand, and panel transitions could be smoother
+    with spring animations. Consider Framer Motion if bundle size allows.
+
+18. OFFLINE SUPPORT
+    PWA with service worker caching for last-seen stories. India has spotty connectivity.
+
+19. AUDIO SYNTHESIS
+    TTS of the synthesis for people who prefer to listen while commuting.
+    Read the facts, then each POV in turn.
+
+20. REGIONAL LANGUAGE SOURCES
+    Currently all sources are English. Add Hindi (Dainik Bhaskar, Amar Ujala),
+    Tamil (Dinamalar, Dinamani), Telugu (Eenadu), Bengali (Anandabazar Patrika).
+    Requires: translation step in synthesis pipeline (Claude handles this well).
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HOW TO REBUILD FROM SCRATCH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. SETUP
+   - Node 20+, pnpm 9+
+   - Clone repo, run: pnpm install
+   - Create Neon PostgreSQL database (neon.tech, free tier)
+   - Copy connection string to apps/web/.env.local as DATABASE_URL
+   - Run: cd packages/db && npx drizzle-kit push (creates tables)
+   - Get API keys: Groq (groq.com, free), Brave Search (brave.com/search/api), optional YouTube
+   - Add all keys to apps/web/.env.local
+
+2. POPULATE DATA
+   - pnpm --filter worker ingest:once          (30-60 min first run)
+   - pnpm --filter worker cluster:once
+   - pnpm --filter worker synth:one            (repeat until quota hit or all done)
+   - pnpm --filter worker link:once
+
+3. RUN UI
+   - cd apps/web && pnpm dev
+   - Open http://localhost:3000
+
+4. DEPLOY
+   - Push to GitHub, connect Vercel, set env vars in Vercel dashboard
+   - vercel.json rootDirectory: "apps/web" handles the monorepo structure
+   - Build will warn about TypeScript errors (Drizzle duplicate) — these are safe to ignore
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DESIGN SYSTEM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+CSS Variables (globals.css):
+  --paper:       #f5f0e3  (parchment background)
+  --paper-alt:   #ede8d6  (slightly darker, for alternating sections)
+  --ink:         #1a1008  (near-black text)
+  --ink-muted:   #5a5040  (secondary text)
+  --ink-faint:   #9a9080  (metadata, timestamps)
+  --rule:        #ccc5b0  (light dividers)
+  --rule-heavy:  #8a8070  (section borders)
+  --red:         #8b0000  (right-heavy lean color, convicted status, rhetoric flags)
+  --navy:        #1a3560  (left-lean color)
+  --forest:      #1e3a1e  (positive/fact color, forest green)
+  --gold:        #8b6914  (alleged status, in-press indicator)
+
+Dark mode uses [data-theme="dark"] attribute on <html> with adjusted values.
+Toggle stored in localStorage as 'ftp-theme' ('dark'|'light').
+
+Typography:
+  Headings: Playfair Display (--font-playfair) — newspaper editorial feel
+  Body: Crimson Text (--font-crimson) — readable serif for long synthesis content
+  Labels/meta: 'Helvetica Neue', Arial (sans-serif) — .sc class (small caps style)
+
+The .sc class: font-size 0.65rem, font-weight 700, letter-spacing 0.1em, uppercase.
+Used for all metadata labels throughout the app.
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+BOTTLENECKS SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. GROQ FREE TIER (100k tokens/day)
+   → Limits how fast you can run synthesis backlog
+   → Shared between trail builder and synthesis worker
+   → Upgrade to paid Groq or switch synthesis to Anthropic API on paid plan
+
+2. SYNTHESIS QUALITY CEILING
+   → Even with a great prompt, Claude sometimes conflates tier-2 and tier-3 facts
+   → Sometimes right_narrative and left_narrative are too similar (LLM averaging)
+   → The LLM liberal bias counterweight in the prompt helps but is imperfect
+   → Solution: human editorial review layer, or confidence scoring + re-synthesis
+
+3. CLUSTERING ACCURACY
+   → Stories about different events with similar keywords get merged
+   → Stories about the same event with different keyword framing get separated
+   → Needs semantic embedding-based clustering
+
+4. DATA FRESHNESS
+   → Ingest/cluster/synth pipeline is manual; no automatic scheduling
+   → Users see stale news if pipeline hasn't been run
+   → Need: scheduled worker (cron/serverless function) for automatic pipeline runs
+
+5. CATEGORY FEEDS
+   → Title-only keyword matching means most stories don't appear in category feeds
+   → Need: synthesis-time category tagging by Claude
