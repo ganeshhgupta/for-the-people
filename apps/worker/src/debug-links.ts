@@ -1,6 +1,6 @@
 import './env.js';
-import { db } from '@tristhana/db/client';
-import { clusterLinks, syntheses } from '@tristhana/db';
+import { db } from '@ftp/db/client';
+import { clusterLinks, syntheses } from '@ftp/db';
 
 const links = await db.select().from(clusterLinks);
 console.log('Total links:', links.length);

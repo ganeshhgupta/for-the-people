@@ -1,8 +1,8 @@
 import './env.js';
-import { db } from '@tristhana/db/client';
-import { articles, clusters, syntheses } from '@tristhana/db';
+import { db } from '@ftp/db/client';
+import { articles, clusters, syntheses } from '@ftp/db';
 import { eq } from 'drizzle-orm';
-import { buildSynthesisPrompt, SynthesisOutputSchema, SOURCE_MAP } from '@tristhana/shared';
+import { buildSynthesisPrompt, SynthesisOutputSchema, SOURCE_MAP } from '@ftp/shared';
 import Groq from 'groq-sdk';
 import { createHash } from 'crypto';
 
@@ -15,13 +15,11 @@ const EMPTY_NARRATIVE = {
   sources_used: [],
 };
 
-// Tolerates common LLM nulls before strict Zod validation
 function sanitize(raw: Record<string, unknown>): Record<string, unknown> {
   const sanitizeStr = (v: unknown) => (v == null ? '' : String(v));
   const sanitizeArr = <T>(v: unknown, itemFn?: (x: unknown) => T): T[] =>
     Array.isArray(v) ? (itemFn ? (v as unknown[]).map(itemFn) : (v as T[])) : [];
 
-  // rhetoric_flags: null string fields → empty string
   const rhetoric_flags = sanitizeArr(raw['rhetoric_flags'], (f: unknown) => {
     const flag = f as Record<string, unknown>;
     return {
@@ -35,7 +33,6 @@ function sanitize(raw: Record<string, unknown>): Record<string, unknown> {
     };
   });
 
-  // named_individuals: null string fields → empty string
   const named_individuals = sanitizeArr(raw['named_individuals'], (ind: unknown) => {
     const i = ind as Record<string, unknown>;
     return {
@@ -46,13 +43,11 @@ function sanitize(raw: Record<string, unknown>): Record<string, unknown> {
     };
   });
 
-  // statistics: null year → current year
   const statistics = sanitizeArr(raw['statistics'], (s: unknown) => {
     const stat = s as Record<string, unknown>;
     return { ...stat, year: typeof stat['year'] === 'number' ? stat['year'] : new Date().getFullYear() };
   });
 
-  // contested_claims: null narratives → empty narrative
   const cc = (raw['contested_claims'] as Record<string, unknown> | null) ?? {};
   const contested_claims = {
     right_narrative: cc['right_narrative'] ?? EMPTY_NARRATIVE,
@@ -60,13 +55,11 @@ function sanitize(raw: Record<string, unknown>): Record<string, unknown> {
     other_narrative: cc['other_narrative'] ?? null,
   };
 
-  // common_ground: if object instead of array, wrap; if null keep null
   let common_ground = raw['common_ground'];
   if (common_ground !== null && !Array.isArray(common_ground) && typeof common_ground === 'object') {
     common_ground = [common_ground];
   }
 
-  // irreconcilable_disagreements: ensure non-empty if common_ground is null
   let irreconcilable = sanitizeArr<string>(raw['irreconcilable_disagreements']);
   if (common_ground === null && irreconcilable.length === 0) {
     irreconcilable = ['Narratives are too divergent to identify common ground.'];
@@ -84,10 +77,10 @@ function sanitize(raw: Record<string, unknown>): Record<string, unknown> {
 }
 
 async function synthesizeCluster(clusterId: string): Promise<void> {
-  const cluster = db.select().from(clusters).where(eq(clusters.id, clusterId)).get();
+  const [cluster] = await db.select().from(clusters).where(eq(clusters.id, clusterId));
   if (!cluster) throw new Error(`Cluster ${clusterId} not found`);
 
-  const clusterArticles = db.select().from(articles).where(eq(articles.clusterId, clusterId)).all();
+  const clusterArticles = await db.select().from(articles).where(eq(articles.clusterId, clusterId));
   if (clusterArticles.length === 0) throw new Error(`No articles for cluster ${clusterId}`);
 
   const articlesForPrompt = clusterArticles.map((a) => ({
@@ -124,11 +117,14 @@ async function synthesizeCluster(clusterId: string): Promise<void> {
 
   const synthId = createHash('sha256').update(clusterId).digest('hex').slice(0, 16);
 
-  db.insert(syntheses).values({ id: synthId, clusterId, output: validated, createdAt: new Date() })
-    .onConflictDoUpdate({ target: syntheses.clusterId, set: { output: validated, createdAt: new Date() } })
-    .run();
+  await db.insert(syntheses)
+    .values({ id: synthId, clusterId, output: validated, createdAt: new Date() })
+    .onConflictDoUpdate({ target: syntheses.clusterId, set: { output: validated, createdAt: new Date() } });
 
-  db.update(clusters).set({ status: 'synthesized', updatedAt: new Date() }).where(eq(clusters.id, clusterId)).run();
+  await db.update(clusters)
+    .set({ status: 'synthesized', updatedAt: new Date() })
+    .where(eq(clusters.id, clusterId));
+
   console.log(`  Done: ${clusterId}`);
 }
 
@@ -138,7 +134,7 @@ async function main() {
   if (targetClusterId) {
     await synthesizeCluster(targetClusterId);
   } else {
-    const pending = db.select({ id: clusters.id }).from(clusters).where(eq(clusters.status, 'pending')).all();
+    const pending = await db.select({ id: clusters.id }).from(clusters).where(eq(clusters.status, 'pending'));
     console.log(`Synthesizing ${pending.length} pending clusters…`);
     for (const { id } of pending) {
       try {

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/db';
-import { syntheses, articles } from '@tristhana/db';
+import { syntheses, articles } from '@ftp/db';
 import { eq } from 'drizzle-orm';
-import { SOURCE_MAP } from '@tristhana/shared';
+import { SOURCE_MAP } from '@ftp/shared';
 
 export const dynamic = 'force-dynamic';
 

@@ -1,5 +1,5 @@
 import { getDb } from '../lib/db';
-import { clusters, articles } from '@tristhana/db';
+import { clusters, articles } from '@ftp/db';
 import { desc, eq, sql } from 'drizzle-orm';
 import { StoryFeed } from '../components/StoryFeed';
 

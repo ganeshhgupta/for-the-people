@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getDb } from '../../../../../lib/db';
-import { clusters, syntheses } from '@tristhana/db';
+import { clusters, syntheses } from '@ftp/db';
 import { eq } from 'drizzle-orm';
 import Groq from 'groq-sdk';
 import type { TrailNode } from '../trail/route';

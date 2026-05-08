@@ -44,6 +44,13 @@ export const syntheses = pgTable('syntheses', {
   createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
 });
 
+export const trails = pgTable('trails', {
+  id: text('id').primaryKey(),
+  clusterId: text('cluster_id').notNull().unique().references(() => clusters.id),
+  nodes: jsonb('nodes').notNull(),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true }).notNull().defaultNow(),
+});
+
 export const clusterLinks = pgTable(
   'cluster_links',
   {

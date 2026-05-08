@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../../lib/db';
-import { clusterLinks, clusters } from '@tristhana/db';
+import { clusterLinks, clusters } from '@ftp/db';
 import { eq } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';

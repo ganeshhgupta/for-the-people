@@ -1,7 +1,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  transpilePackages: ['@tristhana/shared', '@tristhana/db'],
+  transpilePackages: ['@ftp/shared', '@ftp/db'],
   eslint: { ignoreDuringBuilds: true },
 };
 

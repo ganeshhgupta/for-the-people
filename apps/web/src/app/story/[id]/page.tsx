@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
 import { getDb } from '../../../lib/db';
-import { clusters, syntheses, articles } from '@tristhana/db';
+import { clusters, syntheses, articles } from '@ftp/db';
 import { eq } from 'drizzle-orm';
-import { SOURCE_MAP } from '@tristhana/shared';
-import type { SynthesisOutput } from '@tristhana/shared';
+import { SOURCE_MAP } from '@ftp/shared';
+import type { SynthesisOutput } from '@ftp/shared';
 import { ArticleImage } from '../../../components/ArticleImage';
 
 export const revalidate = 60;

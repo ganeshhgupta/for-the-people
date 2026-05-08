@@ -1,5 +1,6 @@
-TRISTHANA / FOR THE PEOPLE — COMPLETE APP GUIDE
-================================================
+FOR THE PEOPLE — COMPLETE APP GUIDE
+====================================
+(Internal monorepo codename: tristhana)
 Written: May 2026
 Purpose: Enable a fresh Claude session to rebuild this app end-to-end from scratch,
          understand current state, known bugs, and roadmap.

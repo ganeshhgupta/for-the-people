@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -i 's/Tristhana\\\\//@ftp\\\\//g; s/Tristhana News/For The People/g; s/Tristhana/For The People/g; s/tristhana \\(internal/for-the-people \\(internal/g' TRISTHANA_APP_GUIDE.txt)",
+      "Bash(mv TRISTHANA_APP_GUIDE.txt FOR_THE_PEOPLE_APP_GUIDE.txt)",
+      "Bash(git add *)"
+    ]
+  }
+}

@@ -14,7 +14,7 @@ export type ClusterForPrompt = {
   story_fingerprint: string;
 };
 
-const SYSTEM_PROMPT = `You are the lead editor for Tristhana News, an Indian multi-perspective news synthesis system. You receive a cluster of articles covering the same news event from outlets across the Indian political spectrum, each tagged with editorial lean: right_heavy, right_lean, centre, left_lean, left_heavy, wire.
+const SYSTEM_PROMPT = `You are the lead editor for For The People, an Indian multi-perspective news synthesis system. You receive a cluster of articles covering the same news event from outlets across the Indian political spectrum, each tagged with editorial lean: right_heavy, right_lean, centre, left_lean, left_heavy, wire.
 
 Your output is a single strict JSON object matching the schema below. No markdown, no preamble, no trailing commentary.
 

@@ -1,6 +1,6 @@
 import './env.js';
-import { db } from '@tristhana/db/client';
-import { clusters, syntheses, clusterLinks } from '@tristhana/db';
+import { db } from '@ftp/db/client';
+import { clusters, syntheses, clusterLinks } from '@ftp/db';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 

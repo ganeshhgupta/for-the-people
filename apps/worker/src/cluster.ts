@@ -1,6 +1,6 @@
 import './env.js';
-import { db } from '@tristhana/db/client';
-import { articles, clusters } from '@tristhana/db';
+import { db } from '@ftp/db/client';
+import { articles, clusters } from '@ftp/db';
 import { isNull, eq, sql } from 'drizzle-orm';
 import { createHash } from 'crypto';
 import Groq from 'groq-sdk';
@@ -91,12 +91,12 @@ async function generateCanonicalTitle(titles: string[]): Promise<string> {
 
 async function main() {
   console.log('Loading unclustered articles…');
-  const rows = db.select({
+  const rows = await db.select({
     id: articles.id,
     title: articles.title,
     publishedAt: articles.publishedAt,
     sourceId: articles.sourceId,
-  }).from(articles).where(isNull(articles.clusterId)).all();
+  }).from(articles).where(isNull(articles.clusterId));
 
   console.log(`  ${rows.length} unclustered articles`);
   if (rows.length === 0) { console.log('Nothing to cluster.'); process.exit(0); }
@@ -109,23 +109,24 @@ async function main() {
     const canonicalTitle = await generateCanonicalTitle(members.map((m) => m.title));
     const fingerprint = members.map((a) => a.id).sort().join(',');
 
-    db.insert(clusters).values({
+    await db.insert(clusters).values({
       id: clusterId,
       canonicalTitle,
       storyFingerprint: fingerprint,
       status: 'pending',
       articleCount: members.length,
-    }).onConflictDoNothing().run();
+    }).onConflictDoNothing();
 
     for (const member of members) {
-      db.update(articles).set({ clusterId }).where(eq(articles.id, member.id)).run();
+      await db.update(articles).set({ clusterId }).where(eq(articles.id, member.id));
     }
 
     clustered += members.length;
     console.log(`  Cluster [${clusterId}]: "${canonicalTitle}" (${members.length} articles)`);
   }
 
-  console.log(`\nDone. Clustered ${clustered} articles into ${clusterMap.size} clusters.`);
+  const [row] = await db.select({ count: sql<number>`count(*)` }).from(clusters);
+  console.log(`\nDone. Clustered ${clustered} articles into ${clusterMap.size} new clusters · DB total: ${row?.count ?? 0}`);
   process.exit(0);
 }
 

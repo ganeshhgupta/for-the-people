@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../../lib/db';
-import { clusters, syntheses, articles, trails } from '@tristhana/db';
+import { clusters, syntheses, articles, trails } from '@ftp/db';
 import { eq } from 'drizzle-orm';
 import Groq from 'groq-sdk';
 import { randomUUID } from 'crypto';
-import { SOURCE_MAP } from '@tristhana/shared';
+import { SOURCE_MAP } from '@ftp/shared';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;

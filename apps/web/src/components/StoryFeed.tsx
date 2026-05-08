@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import type { SynthesisOutput } from '@tristhana/shared';
+import type { SynthesisOutput } from '@ftp/shared';
 import { TrailDrawer } from './TrailDrawer';
 
 /* ── Types ────────────────────────────────────────── */
@@ -807,7 +807,7 @@ function ProfileDrawer({ open, onClose, dark, onToggleDark, videoMode, onToggleV
           <p style={{ fontSize:'0.87rem', color:'var(--ink-muted)', lineHeight:1.65 }}>
             For the People — Indian news synthesized across the political spectrum, without spin.
           </p>
-          <p style={{ fontSize:'0.83rem', color:'var(--ink-faint)', marginTop:'0.5rem' }}>Powered by Tristhana</p>
+          <p style={{ fontSize:'0.83rem', color:'var(--ink-faint)', marginTop:'0.5rem' }}>Version 1.0</p>
         </div>
       </div>
     </>

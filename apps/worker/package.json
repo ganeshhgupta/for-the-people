@@ -1,5 +1,5 @@
 {
-  "name": "@tristhana/worker",
+  "name": "@ftp/worker",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
-    "@tristhana/db": "workspace:*",
-    "@tristhana/shared": "workspace:*",
+    "@ftp/db": "workspace:*",
+    "@ftp/shared": "workspace:*",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.38.3",
     "groq-sdk": "^0.9.1",

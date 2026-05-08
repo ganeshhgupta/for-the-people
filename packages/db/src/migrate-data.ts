@@ -1,6 +1,6 @@
 /**
  * One-time script: migrate data from local tristhana.db (SQLite) → Neon PostgreSQL.
- * Run from repo root: pnpm --filter @tristhana/db migrate-data
+ * Run from repo root: pnpm --filter @ftp/db migrate-data
  */
 import { config } from 'dotenv';
 import { resolve, dirname } from 'path';

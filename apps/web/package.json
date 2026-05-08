@@ -1,5 +1,5 @@
 {
-  "name": "@tristhana/web",
+  "name": "@ftp/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
-    "@tristhana/db": "workspace:*",
-    "@tristhana/shared": "workspace:*",
+    "@ftp/db": "workspace:*",
+    "@ftp/shared": "workspace:*",
     "drizzle-orm": "^0.38.3",
     "next": "^15.1.4",
     "react": "^19.0.0",
