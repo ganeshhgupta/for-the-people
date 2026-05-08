@@ -569,7 +569,7 @@ function StoryCard({ cluster, expandedId, loadingId, data, onExpand, videoMode, 
             {playingVideoId && (
               <>
                 <iframe
-                  src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1`}
+                  src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1&mute=1&playsinline=1&rel=0`}
                   title="video"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
