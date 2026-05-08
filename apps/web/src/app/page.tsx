@@ -3,7 +3,7 @@ import { clusters, articles } from '@ftp/db';
 import { desc, eq, sql } from 'drizzle-orm';
 import { StoryFeed } from '../components/StoryFeed';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const db = getDb();
@@ -11,11 +11,8 @@ export default async function HomePage() {
   const rows = await db
     .select()
     .from(clusters)
-    .orderBy(
-      sql`CASE WHEN ${clusters.status} = 'synthesized' THEN 0 ELSE 1 END`,
-      desc(clusters.createdAt)
-    )
-    .limit(10);
+    .orderBy(sql`(SELECT MAX(published_at) FROM articles WHERE cluster_id = clusters.id) DESC NULLS LAST`)
+    .limit(20);
 
   const coverMap: Record<string, string | null> = {};
   for (const row of rows) {
@@ -35,7 +32,7 @@ export default async function HomePage() {
     coverImage: coverMap[r.id] ?? null,
   }));
 
-  const totalCount = await db.$count(clusters);
+  const [{ totalCount }] = await db.select({ totalCount: sql<number>`cast(count(*) as int)` }).from(clusters);
 
   return <StoryFeed initialClusters={clusterData} totalCount={totalCount} />;
 }

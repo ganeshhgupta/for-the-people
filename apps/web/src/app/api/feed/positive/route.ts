@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     .select()
     .from(clusters)
     .where(eq(clusters.status, 'synthesized'))
-    .orderBy(desc(clusters.createdAt));
+    .orderBy(sql`(SELECT MAX(published_at) FROM articles WHERE cluster_id = clusters.id) DESC NULLS LAST`);
 
   const allSynths = await db.select({ clusterId: syntheses.clusterId, output: syntheses.output }).from(syntheses);
   const synthMap = new Map(allSynths.map(s => [s.clusterId, s.output as Record<string, unknown>]));

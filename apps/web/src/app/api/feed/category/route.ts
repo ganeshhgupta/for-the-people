@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/db';
 import { clusters, articles } from '@ftp/db';
-import { eq, desc } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     .select()
     .from(clusters)
     .where(eq(clusters.status, 'synthesized'))
-    .orderBy(desc(clusters.createdAt));
+    .orderBy(sql`(SELECT MAX(published_at) FROM articles WHERE cluster_id = clusters.id) DESC NULLS LAST`);
 
   const matched = allClusters.filter(c => {
     const lower = c.canonicalTitle.toLowerCase();

@@ -100,7 +100,7 @@ const STATUS_COLOR: Record<string,string> = {
 function CoverImage({ src, alt, initials }: { src:string|null; alt:string; initials:string }) {
   const [failed, setFailed] = useState(false);
   return (
-    <div style={{ width:'calc(100% + 2rem)', marginLeft:'-1rem', overflow:'hidden', background:'var(--paper-alt)' }}>
+    <div style={{ width:'100%', overflow:'hidden', background:'var(--paper-alt)' }}>
       {src && !failed
         ? <img src={src} alt={alt} onError={() => setFailed(true)} loading="lazy" style={{ width:'100%', height:'auto', display:'block' }} /> // eslint-disable-line @next/next/no-img-element
         : <div style={{ height:'220px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'0.5rem' }}>
@@ -509,14 +509,13 @@ function StoryCard({ cluster, expandedId, loadingId, data, onExpand, videoMode, 
     switchVideo(nextPos === 0 ? null : (vids[nextPos - 1]?.videoId ?? null));
   }
 
+  // Pre-fetch videos as soon as card opens; also auto-play first if videoMode is on
   useEffect(() => {
-    if (!isOpen || !videoMode) return;
+    if (!isOpen) return;
     let cancelled = false;
     (async () => {
-      await new Promise(r => setTimeout(r, 500));
-      if (cancelled) return;
       const vids = await ensureVideos();
-      if (cancelled || vids.length === 0) return;
+      if (cancelled || !videoMode || vids.length === 0) return;
       switchVideo(vids[0]?.videoId ?? null);
     })();
     return () => { cancelled = true; };
@@ -543,7 +542,7 @@ function StoryCard({ cluster, expandedId, loadingId, data, onExpand, videoMode, 
       >
         {/* Media */}
         <div
-          style={{ display:'grid', overflow:'hidden', width:'calc(100% + 2rem)', marginLeft:'-1rem' }}
+          style={{ display:'grid', overflow:'hidden', width:'100%' }}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
         >
@@ -575,6 +574,12 @@ function StoryCard({ cluster, expandedId, loadingId, data, onExpand, videoMode, 
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                   style={{ position:'absolute', inset:0, width:'100%', height:'100%', border:'none', display:'block' }}
+                />
+                {/* Transparent overlay captures swipe gestures — iframe eats all touch events otherwise */}
+                <div
+                  style={{ position:'absolute', inset:0, zIndex:5 }}
+                  onTouchStart={onTouchStart}
+                  onTouchEnd={onTouchEnd}
                 />
                 <button
                   onClick={e => { e.stopPropagation(); switchVideo(null); }}
@@ -1080,7 +1085,6 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
       <div style={{
         position:'sticky', top:0, zIndex:200,
         background:'var(--paper)', borderBottom:'2px solid var(--rule-heavy)',
-        marginLeft:'-1rem', marginRight:'-1rem',
         paddingLeft:'1rem', paddingRight:'1rem',
         transition:'background 0.2s',
       }}>
@@ -1166,7 +1170,7 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
       {/* ── Swipe feed container ── */}
       {!activePanel && (
         <div
-          style={{ overflow:'hidden', marginLeft:'-1rem', marginRight:'-1rem' }}
+          style={{ overflow:'hidden' }}
           onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
         >
           <div style={{

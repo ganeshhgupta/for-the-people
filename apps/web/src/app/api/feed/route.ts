@@ -17,10 +17,7 @@ export async function GET(req: Request) {
   const rows = await db
     .select()
     .from(clusters)
-    .orderBy(
-      sql`CASE WHEN ${clusters.status} = 'synthesized' THEN 0 ELSE 1 END`,
-      desc(clusters.createdAt)
-    )
+    .orderBy(sql`(SELECT MAX(published_at) FROM articles WHERE cluster_id = clusters.id) DESC NULLS LAST`)
     .limit(limit + 1)
     .offset(offset);
 

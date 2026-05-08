@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body suppressHydrationWarning>
         <SplashScreen />
-        <main style={{ maxWidth: '760px', margin: '0 auto', padding: '0 1rem 5rem' }}>
+        <main style={{ maxWidth: '760px', margin: '0 auto', padding: '0 0 5rem' }}>
           {children}
         </main>
       </body>
