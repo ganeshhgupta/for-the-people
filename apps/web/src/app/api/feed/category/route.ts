@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/db';
-import { clusters, articles } from '@ftp/db';
-import { eq, sql } from 'drizzle-orm';
+import { clusters, syntheses, articles } from '@ftp/db';
+import { eq, sql, inArray, isNotNull, and } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +31,15 @@ export async function GET(req: Request) {
     .where(eq(clusters.status, 'synthesized'))
     .orderBy(sql`(SELECT MAX(published_at) FROM articles WHERE cluster_id = clusters.id) DESC NULLS LAST`);
 
+  const allSynths = await db.select({ clusterId: syntheses.clusterId, output: syntheses.output }).from(syntheses);
+  const synthMap = new Map(allSynths.map(s => [s.clusterId, s.output as Record<string, unknown>]));
+
   const matched = allClusters.filter(c => {
+    const out = synthMap.get(c.id);
+    // Use synthesis categories first (more accurate than title keywords)
+    const synthCategories = out?.categories as string[] | undefined;
+    if (synthCategories && synthCategories.includes(cat)) return true;
+    // Fall back to title keyword matching for older records without categories
     const lower = c.canonicalTitle.toLowerCase();
     return keywords.some(kw => lower.includes(kw));
   });
@@ -39,10 +47,18 @@ export async function GET(req: Request) {
   const pageRows = matched.slice(offset, offset + limit);
   const hasMore = matched.length > offset + limit;
 
+  const clusterIds = pageRows.map(r => r.id);
   const coverMap: Record<string, string | null> = {};
-  for (const row of pageRows) {
-    const imgs = await db.select({ imageUrl: articles.imageUrl }).from(articles).where(eq(articles.clusterId, row.id));
-    coverMap[row.id] = imgs.find(i => i.imageUrl)?.imageUrl ?? null;
+  if (clusterIds.length > 0) {
+    const imgs = await db
+      .select({ clusterId: articles.clusterId, imageUrl: articles.imageUrl })
+      .from(articles)
+      .where(and(inArray(articles.clusterId, clusterIds), isNotNull(articles.imageUrl)));
+    for (const img of imgs) {
+      if (img.clusterId && img.imageUrl && !coverMap[img.clusterId]) {
+        coverMap[img.clusterId] = img.imageUrl;
+      }
+    }
   }
 
   return NextResponse.json({

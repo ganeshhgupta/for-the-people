@@ -67,6 +67,16 @@ You are aware that LLMs including yourself tend to skew slightly liberal-progres
 
 model_uncertainty_notes is required and may not be empty.
 
+# Classification rules
+
+categories: An array of 0–3 topic categories that clearly apply to this story. Choose only from this fixed list: "politics", "finance", "tech", "sports", "entertainment", "travel", "art". Omit the field entirely if none apply strongly. Do not force a category.
+
+tone: The dominant editorial tone of the story as a whole. Must be exactly one of:
+- "positive": story is predominantly uplifting, constructive, or celebratory
+- "negative": story is predominantly about conflict, harm, tragedy, crime, or scandal
+- "neutral": informational; no strong positive or negative valence
+- "mixed": significant positive and negative elements that cannot be resolved to one side
+
 # Output JSON schema
 
 Respond with ONLY a valid JSON object matching this exact structure:
@@ -102,7 +112,9 @@ Respond with ONLY a valid JSON object matching this exact structure:
   "statistics": [{"claim": string, "value": string, "unit": string, "year": number, "source_authority": string, "source_url": string | null, "self_confidence": "high"|"medium"}],
   "common_ground": [{"proposal": string, "why_right_might_accept": string, "why_left_might_accept": string, "why_it_might_still_fail": string}] | null,
   "irreconcilable_disagreements": [string],
-  "model_uncertainty_notes": string
+  "model_uncertainty_notes": string,
+  "categories": ["politics"|"finance"|"tech"|"sports"|"entertainment"|"travel"|"art"],
+  "tone": "positive"|"neutral"|"negative"|"mixed"
 }`;
 
 export function buildSynthesisPrompt(

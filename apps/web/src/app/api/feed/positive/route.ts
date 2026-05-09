@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../../lib/db';
 import { clusters, syntheses, articles } from '@ftp/db';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, sql, inArray, isNotNull, and } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,24 +55,33 @@ export async function GET(req: Request) {
   const allSynths = await db.select({ clusterId: syntheses.clusterId, output: syntheses.output }).from(syntheses);
   const synthMap = new Map(allSynths.map(s => [s.clusterId, s.output as Record<string, unknown>]));
 
-  // Filter: positive title keywords AND not a negative/tragedy story
-  // common_ground alone is not sufficient — tragedy stories can have common_ground proposals too
+  // Filter: use synthesis tone first, then fall back to keyword + common_ground heuristics
   const positive = allClusters.filter(c => {
     if (isNegativeTitle(c.canonicalTitle)) return false;
-    if (isPositiveTitle(c.canonicalTitle)) return true;
     const out = synthMap.get(c.id);
-    if (!out) return false;
-    const cg = out.common_ground;
+    // Synthesis-time tone classification is the most reliable signal
+    if (out?.tone === 'positive') return true;
+    if (out?.tone === 'negative') return false;
+    if (isPositiveTitle(c.canonicalTitle)) return true;
+    const cg = out?.common_ground;
     return Array.isArray(cg) && cg.length > 0;
   });
 
   const pageRows = positive.slice(offset, offset + limit);
   const hasMore = positive.length > offset + limit;
 
+  const clusterIds = pageRows.map(r => r.id);
   const coverMap: Record<string, string | null> = {};
-  for (const row of pageRows) {
-    const imgs = await db.select({ imageUrl: articles.imageUrl }).from(articles).where(eq(articles.clusterId, row.id));
-    coverMap[row.id] = imgs.find(i => i.imageUrl)?.imageUrl ?? null;
+  if (clusterIds.length > 0) {
+    const imgs = await db
+      .select({ clusterId: articles.clusterId, imageUrl: articles.imageUrl })
+      .from(articles)
+      .where(and(inArray(articles.clusterId, clusterIds), isNotNull(articles.imageUrl)));
+    for (const img of imgs) {
+      if (img.clusterId && img.imageUrl && !coverMap[img.clusterId]) {
+        coverMap[img.clusterId] = img.imageUrl;
+      }
+    }
   }
 
   return NextResponse.json({
