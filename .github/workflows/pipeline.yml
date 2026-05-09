@@ -16,7 +16,7 @@ jobs:
           echo "Triggering pipeline at $(date -u)"
           response=$(curl -s -w "\n%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://forthepeopleapp.vercel.app/api/cron/pipeline")
+            "https://forthepeoplenews.vercel.app/api/cron/pipeline")
           http_status=$(echo "$response" | tail -1)
           body=$(echo "$response" | head -n -1)
           echo "HTTP status: $http_status"

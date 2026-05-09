@@ -129,7 +129,7 @@ async function ingestRss(db: ReturnType<typeof getDb>): Promise<number> {
   for (const feed of RSS_FEEDS) {
     try {
       const res = await fetch(feed.url, {
-        headers: { 'User-Agent': 'ForThePeople/1.0 (+https://forthepeopleapp.vercel.app)' },
+        headers: { 'User-Agent': 'ForThePeople/1.0 (+https://forthepeoplenews.vercel.app)' },
         signal: AbortSignal.timeout(8_000),
       });
       if (!res.ok) continue;
