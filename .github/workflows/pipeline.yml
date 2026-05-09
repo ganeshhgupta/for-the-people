@@ -1,0 +1,27 @@
+name: Hourly pipeline
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # Every hour at :00
+  workflow_dispatch:        # Manual trigger from GitHub Actions tab
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Trigger cron pipeline
+        run: |
+          echo "Triggering pipeline at $(date -u)"
+          response=$(curl -s -w "\n%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://forthepeopleapp.vercel.app/api/cron/pipeline")
+          http_status=$(echo "$response" | tail -1)
+          body=$(echo "$response" | head -n -1)
+          echo "HTTP status: $http_status"
+          echo "Response: $body"
+          if [ "$http_status" != "200" ]; then
+            echo "Pipeline returned non-200 status"
+            exit 1
+          fi

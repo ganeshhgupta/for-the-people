@@ -84,6 +84,8 @@ export const SynthesisOutputSchema = z
     common_ground: z.array(CommonGroundSchema).nullable(),
     irreconcilable_disagreements: z.array(z.string()),
     model_uncertainty_notes: z.string().min(1),
+    categories: z.array(z.enum(['politics', 'finance', 'tech', 'sports', 'entertainment', 'travel', 'art'])).optional(),
+    tone: z.enum(['positive', 'neutral', 'negative', 'mixed']).optional(),
   })
   .refine(
     (data) => {

@@ -978,6 +978,40 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
     return () => clearInterval(id);
   }, [feeds.main.clusters]);
 
+  /* SSE: real-time new clusters from cron pipeline */
+  useEffect(() => {
+    let es: EventSource | null = null;
+    let active = true;
+    let latestSince = new Date().toISOString();
+
+    function connect() {
+      if (!active) return;
+      if (es) { es.close(); es = null; }
+      es = new EventSource(`/api/feed/events?since=${encodeURIComponent(latestSince)}`);
+      es.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data) as { type: string; cluster?: ClusterRow };
+          if (msg.type === 'new_cluster' && msg.cluster) {
+            latestSince = new Date().toISOString();
+            setFeeds(prev => {
+              const mainState = prev.main;
+              if (mainState.clusters.some(c => c.id === msg.cluster!.id)) return prev;
+              return { ...prev, main: { ...mainState, clusters: [msg.cluster!, ...mainState.clusters] } };
+            });
+          }
+        } catch { /* ignore malformed messages */ }
+      };
+      es.onerror = () => {
+        es?.close();
+        es = null;
+        if (active) setTimeout(connect, 3_000);
+      };
+    }
+
+    connect();
+    return () => { active = false; es?.close(); };
+  }, []);
+
   /* load more for a channel */
   const loadMoreChannel = useCallback(async (ch: FeedChannel, offset: number) => {
     const state = feedsRef.current[ch];
@@ -1077,6 +1111,39 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
     });
   }, []);
 
+  /* all loaded clusters for search/starred */
+  const allClusters = useMemo(() => {
+    const seen = new Set<string>();
+    const result: ClusterRow[] = [];
+    for (const ch of FEED_CHANNELS) {
+      for (const c of feeds[ch].clusters) {
+        if (!seen.has(c.id)) { seen.add(c.id); result.push(c); }
+      }
+    }
+    return result;
+  }, [feeds]);
+
+  /* fetch starred clusters not yet in any loaded channel */
+  useEffect(() => {
+    if (activePanel !== 'starred' || starredIds.size === 0) return;
+    const loadedIds = new Set(allClusters.map(c => c.id));
+    const missing = [...starredIds].filter(id => !loadedIds.has(id));
+    if (missing.length === 0) return;
+    fetch(`/api/clusters/batch?ids=${missing.join(',')}`)
+      .then(r => r.json())
+      .then((data: { clusters?: ClusterRow[] }) => {
+        if (!data.clusters?.length) return;
+        setFeeds(prev => {
+          const mainState = prev.main;
+          const seen = new Set(mainState.clusters.map(c => c.id));
+          const fresh = data.clusters!.filter(c => !seen.has(c.id));
+          if (fresh.length === 0) return prev;
+          return { ...prev, main: { ...mainState, clusters: [...mainState.clusters, ...fresh] } };
+        });
+      })
+      .catch(() => { /* non-critical */ });
+  }, [activePanel, starredIds, allClusters]);
+
   /* toggle overlay panel — second tap closes */
   const togglePanel = useCallback((p: 'search' | 'filters' | 'starred') => {
     setActivePanel(prev => prev === p ? null : p);
@@ -1093,18 +1160,6 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
     if (dx < 0 && idx < FEED_CHANNELS.length - 1) switchFeedChannel(FEED_CHANNELS[idx + 1]!);
     else if (dx > 0 && idx > 0) switchFeedChannel(FEED_CHANNELS[idx - 1]!);
   }
-
-  /* all loaded clusters for search/starred */
-  const allClusters = useMemo(() => {
-    const seen = new Set<string>();
-    const result: ClusterRow[] = [];
-    for (const ch of FEED_CHANNELS) {
-      for (const c of feeds[ch].clusters) {
-        if (!seen.has(c.id)) { seen.add(c.id); result.push(c); }
-      }
-    }
-    return result;
-  }, [feeds]);
 
   const N = FEED_CHANNELS.length;
   const chIdx = FEED_CHANNELS.indexOf(feedChannel);

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '../../../lib/db';
 import { clusters, articles } from '@ftp/db';
-import { desc, eq, sql } from 'drizzle-orm';
+import { eq, sql, inArray, isNotNull, and } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,14 +24,19 @@ export async function GET(req: Request) {
   const hasMore  = rows.length > limit;
   const pageRows = rows.slice(0, limit);
 
-  // First non-null imageUrl per cluster
+  // First non-null imageUrl per cluster — single batched query
+  const clusterIds = pageRows.map(r => r.id);
   const coverMap: Record<string, string | null> = {};
-  for (const row of pageRows) {
+  if (clusterIds.length > 0) {
     const imgs = await db
-      .select({ imageUrl: articles.imageUrl })
+      .select({ clusterId: articles.clusterId, imageUrl: articles.imageUrl })
       .from(articles)
-      .where(eq(articles.clusterId, row.id));
-    coverMap[row.id] = imgs.find(i => i.imageUrl)?.imageUrl ?? null;
+      .where(and(inArray(articles.clusterId, clusterIds), isNotNull(articles.imageUrl)));
+    for (const img of imgs) {
+      if (img.clusterId && img.imageUrl && !coverMap[img.clusterId]) {
+        coverMap[img.clusterId] = img.imageUrl;
+      }
+    }
   }
 
   return NextResponse.json({
