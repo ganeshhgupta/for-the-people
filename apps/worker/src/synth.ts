@@ -65,6 +65,12 @@ function sanitize(raw: Record<string, unknown>): Record<string, unknown> {
     irreconcilable = ['Narratives are too divergent to identify common ground.'];
   }
 
+  const VALID_TONES = new Set(['positive', 'neutral', 'negative', 'mixed']);
+  const VALID_CATS = new Set(['politics', 'finance', 'tech', 'sports', 'entertainment', 'travel', 'art']);
+  const rawTone = typeof raw['tone'] === 'string' ? raw['tone'].toLowerCase() : undefined;
+  const tone = rawTone && VALID_TONES.has(rawTone) ? rawTone : undefined;
+  const categories = sanitizeArr<string>(raw['categories']).map(c => c.toLowerCase()).filter(c => VALID_CATS.has(c));
+
   return {
     ...raw,
     rhetoric_flags,
@@ -73,6 +79,8 @@ function sanitize(raw: Record<string, unknown>): Record<string, unknown> {
     contested_claims,
     common_ground,
     irreconcilable_disagreements: irreconcilable,
+    tone,
+    categories: categories.length > 0 ? categories : undefined,
   };
 }
 
