@@ -1111,6 +1111,18 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
     });
   }, []);
 
+  /* all loaded clusters for search/starred */
+  const allClusters = useMemo(() => {
+    const seen = new Set<string>();
+    const result: ClusterRow[] = [];
+    for (const ch of FEED_CHANNELS) {
+      for (const c of feeds[ch].clusters) {
+        if (!seen.has(c.id)) { seen.add(c.id); result.push(c); }
+      }
+    }
+    return result;
+  }, [feeds]);
+
   /* fetch starred clusters not yet in any loaded channel */
   useEffect(() => {
     if (activePanel !== 'starred' || starredIds.size === 0) return;
@@ -1148,18 +1160,6 @@ export function StoryFeed({ initialClusters, totalCount }: { initialClusters: Cl
     if (dx < 0 && idx < FEED_CHANNELS.length - 1) switchFeedChannel(FEED_CHANNELS[idx + 1]!);
     else if (dx > 0 && idx > 0) switchFeedChannel(FEED_CHANNELS[idx - 1]!);
   }
-
-  /* all loaded clusters for search/starred */
-  const allClusters = useMemo(() => {
-    const seen = new Set<string>();
-    const result: ClusterRow[] = [];
-    for (const ch of FEED_CHANNELS) {
-      for (const c of feeds[ch].clusters) {
-        if (!seen.has(c.id)) { seen.add(c.id); result.push(c); }
-      }
-    }
-    return result;
-  }, [feeds]);
 
   const N = FEED_CHANNELS.length;
   const chIdx = FEED_CHANNELS.indexOf(feedChannel);
